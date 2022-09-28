@@ -23,6 +23,12 @@ import urllib
 import multiprocessing
 from multiprocessing import Process
 
+import scapy_p0f
+from scapy.layers.inet import IP,TCP
+from scapy_p0f import p0f, p0f_impersonate
+
+
+
 # Some configuration
 sys.tracebacklimit = 0
 conf.verbose = 0
@@ -597,9 +603,9 @@ def print_tcp_packet(pl, destination):
     option_list = tcp.parse_opts(pkt.tcp.opts)
     
     if opts.verbose:
-        print " [+] Modifying '%s' packet in real time (total length %s)" % (destination, pl.get_payload_len())
+        print " [+] Packet '%s' (total length %s)" % (destination, pl.get_payload_len())
         print "      [+] IP:  source %s destination %s tos %s id %s" % (inet_ntoa(pkt.src), inet_ntoa(pkt.dst), pkt.tos, pkt.id)
-        print "      [+] TCP: sport %s dport %s flags S seq %s ack %s win %s" % (pkt.tcp.sport, pkt.tcp.dport, pkt.tcp.seq, pkt.tcp.ack, pkt.tcp.win)
+        print "      [+] TCP: sport %s dport %s flags %s seq %s ack %s win %s" % (pkt.tcp.sport, pkt.tcp.dport, tcp_flags(pkt.tcp.flags),  pkt.tcp.seq, pkt.tcp.ack, pkt.tcp.win)
         print "               options %s" % (opts_human(option_list))
 
 def print_icmp_packet(pl): 
@@ -633,8 +639,23 @@ def cb_p0f( pl ):
     # During PolicyBasedRouting, when we afterwards route the packets via
     # .. another interface, its SRC_IP remains always of main interface, as TCP stack sees it.
 
+    #if opts.verbose:
+        #print " [+] got packet", "flags", tcp_flags(pkt.tcp.flags) , inet_ntoa(pkt.src), ">", inet_ntoa(pkt.dst), "pkt.id", pkt.id
+
     #if (inet_ntoa(pkt.src) == home_ip) and (pkt.p == ip.IP_PROTO_TCP) and (tcp_flags(pkt.tcp.flags) == "S"):
-    if (pkt.p == ip.IP_PROTO_TCP) and (tcp_flags(pkt.tcp.flags) == "S"):
+    tcp_flag_my=tcp_flags(pkt.tcp.flags)
+    if (pkt.p == ip.IP_PROTO_TCP) and (
+            (tcp_flag_my  == "S") 
+               #or ( tcp_flag_my == "A") 
+            ):
+
+        if opts.verbose:
+            print(" [+] original packet:")
+            print_tcp_packet(pl, "p0f")
+            scapy_verbose=True
+        else:
+            scapy_verbose=False
+
         options = pkt.tcp.opts.encode('hex_codec')
         op = options.find("080a")
         if (op != -1):
@@ -643,34 +664,90 @@ def cb_p0f( pl ):
             i = int(timestamp, 16)
         if opts.osgenre and opts.details_p0f:
             try:
-                pkt_send = module_p0f.p0f_impersonate(IP(dst=inet_ntoa(pkt.dst), src=inet_ntoa(pkt.src), id=pkt.id, tos=pkt.tos) / TCP(
-                    sport=pkt.tcp.sport, dport=pkt.tcp.dport, flags='S', seq=pkt.tcp.seq, ack=0), i, osgenre=opts.osgenre, osdetails=opts.details_p0f)
-                if opts.verbose:
-                    print_tcp_packet(pl, "p0f")
+                #sig = '*:64:0:*:65535,3:mss,nop,ws,nop,nop,ts2,sok,eol+1:df,id+:0'  #macos
+                if (tcp_flag_my  == "S"):
+
+                    option_list = tcp.parse_opts(pkt.tcp.opts)
+
+                    # we can retrieve TS only for SYN packets??
+                    for o, v in option_list:
+                     if o == TCP_OPT_TIMESTAMP:
+                      tss=struct.unpack('>II', v)
+                      ts1=tss[0]
+                      ts2=tss[1]
+                     elif o == TCP_OPT_MSS:
+                      orig_mss= struct.unpack('>H', v)[0]
+
+                      #print "orig ts1", tss[0]
+                      #print "orig ts2", tss[1]
+                      #print "orig mss", orig_mss
+
+                    TCP_OPTS=[ ('MSS', orig_mss), ('Timestamp',(ts1,ts2)), ('NOP',0), ('NOP',0), ('NOP',0)  ]
+                    
+                    #signature_O= ('65535', 64, 1, 64, 'M1460,N,W5,N,N,T0,S,E,E', 'PZ', 'test', 'testA')
+                    #pkt_send = module_p0f.p0f_impersonate(IP(dst=inet_ntoa(pkt.dst), src=inet_ntoa(pkt.src), id=pkt.id, tos=pkt.tos) / TCP( sport=pkt.tcp.sport, dport=pkt.tcp.dport, flags=tcp_flag_my , seq=pkt.tcp.seq, ack=0), i, signature=signature_O )
+
+                    #p0f3:
+                    #sig = ver:ittl:olen:mss:wsize,scale:olayout:quirks:pclass
+
+
+                    #sig='*:64:0:*:65535,4:mss,nop,ws,nop,nop,ts,sok,eol+1:df,id+:0' #mac os WORK
+                    sigs_my={
+                            "Android1":     '*:64:0:*:mss*44,1:mss,sok,ts,nop,ws:df,id+:0', #p0f3 compliant
+                            "Android2":     '*:64:0:*:mss*44,3:mss,sok,ts,nop,ws:df,id+:0', #p0f3 compliant
+                            "Android3":     '*:64:0:*:65535,8:mss,sok,ts,nop,ws:df,id+:0',  #p0f3 NOT compliant but modern!
+                            "ios":          '*:64:0:*:65535,2:mss,nop,ws,nop,nop,ts,sok,eol+1:df,id+:0', #   Mac OS X (iPhone or iPad)
+                            "macosx_1":     '*:64:0:*:65535,1:mss,nop,ws,nop,nop,ts,sok,eol+1:df,id+:0',
+                            "macosx_2":     '*:64:0:*:65535,3:mss,nop,ws,nop,nop,ts,sok,eol+1:df,id+:0',
+                            "macosx_3":     '*:64:0:*:65535,4:mss,nop,ws,nop,nop,ts,sok,eol+1:df,id+:0',
+                            "macosx_4":     '*:64:0:*:65535,6:mss,nop,ws,nop,nop,ts,sok,eol+1:df,id+:0',
+                            "win_1":        '*:128:0:*:8192,8:mss,nop,ws,nop,nop,sok:df,id+:0',
+                            "win_2":        '*:128:0:*:8192,0:mss,nop,nop,sok:df,id+:0',
+                            "win_3":        '*:128:0:*:8192,2:mss,nop,ws,nop,nop,sok:df,id+:0',
+                             }
+                
+                    #                                                    incolumi    valdik  brows/lea  whoer 
+                    #sig='*:64:0:*:mss*44,1:mss,sok,ts,nop,ws:df,id+:0' # Lin         Andr   Andr       Andr
+                    #sig='*:64:0:*:mss*44,3:mss,sok,ts,nop,ws:df,id+:0'  # Lin         Andr   Andr       Andr
+                    #sig='*:64:0:*:65535,8:mss,sok,ts,nop,ws:df,id+:0'   # A         L       L           ?
+
+                    sig_name="win_1"
+                    sig=sigs_my[sig_name]
+
+
+                    try:
+                        pkt_send = scapy_p0f.p0f_impersonate(IP(dst=inet_ntoa(pkt.dst), src=inet_ntoa(pkt.src), id=pkt.id, tos=pkt.tos)/TCP( sport=pkt.tcp.sport, dport=pkt.tcp.dport, flags=tcp_flag_my , seq=pkt.tcp.seq, ack=0 , options=TCP_OPTS ), signature=sig, verbose=scapy_verbose )
+                    except ValueError as ve:
+                        print ve
+
+#                if (tcp_flag_my  == "A"):
+#                    # totally useless!!!!!!!!!!!! must be deleted<<<
+#                   
+#                    TCP_OPTS=[ ('NOP',0)   ]
+#                    
+#                    sig = '*:64:0:*:65535,0:mss,nop,ws,sok,eol+1:df,id+:0'
+#
+#                    try:
+#                        pkt_send = scapy_p0f.p0f_impersonate(IP(dst=inet_ntoa(pkt.dst), src=inet_ntoa(pkt.src), id=pkt.id, tos=pkt.tos)/TCP( sport=pkt.tcp.sport, dport=pkt.tcp.dport, flags=tcp_flag_my , seq=pkt.tcp.seq, ack=1, options=TCP_OPTS ), signature=sig , verbose=scapy_verbose )
+#                    except ValueError as ve:
+#                        print " [+] scapy returned:", ve
+#
+#                
+#                    # totally useless!!!!!!!!!!!! must be deleted<<<
+                pkt = IP(dst=inet_ntoa(pkt.dst), src=inet_ntoa(pkt.src), id=pkt.id, tos=pkt.tos) 
+            
                 pl.set_payload(str(pkt_send))
                 pl.accept()  
             except Exception, e:
                 print " [+] Unable to modify packet with p0f personality..."
-                print " [+] Aborting"
-                sys.exit()
-        elif opts.osgenre and not opts.details_p0f:
-            try:
-                pkt_send = module_p0f.p0f_impersonate(IP(dst=inet_ntoa(pkt.dst), src=inet_ntoa(pkt.src)) / TCP(
-                    sport=pkt.tcp.sport, dport=pkt.tcp.dport, flags='S', seq=pkt.tcp.seq), i, osgenre=opts.osgenre)
-                if opts.verbose:
-                  print_tcp_packet(pl, "p0f") 
-                pl.set_payload(str(pkt_send))
-                pl.accept() 
-            except Exception, e:
-                print " [+] Unable to modify packet with p0f personality..."
-                print " [+] Aborting"
+                print " [+] Aborting because:", e
                 sys.exit()
         else:
             pl.accept()
     else:
         pl.accept()
         if opts.verbose:
-            print " [+] Ignored packet:   source %s destination %s tos %s id %s" % (inet_ntoa(pkt.src), inet_ntoa(pkt.dst), pkt.tos, pkt.id)
+            print " [+] Ignored packet: source %s destination %s tos %s id %s tcp flag %s" % (inet_ntoa(pkt.src), inet_ntoa(pkt.dst), pkt.tos, pkt.id, tcp_flag_my)
       #  return 0
 
 # Process nmap packets
@@ -914,35 +991,37 @@ def main():
 
   if opts.interface:
     interface = opts.interface 
-    try:
-      q_num0 = os.listdir("/sys/class/net/").index(opts.interface) * 2
-      q_num1 = os.listdir("/sys/class/net/").index(opts.interface) * 2 + 1
-    except ValueError, err:
-      q_num0 = -1
-      q_num1 = -1
   else:
     interface = get_default_iface_name_linux()
-    try:
-      q_num0 = os.listdir("/sys/class/net/").index(interface) * 2
-      q_num1 = os.listdir("/sys/class/net/").index(interface) * 2 + 1
-    except ValueError, err:
-      q_num0 = -1
-      q_num1 = -1
 
-  print " [+] detected interface: %s" % interface
+#  if opts.qnum:
+#    q_num0  = opts.qnum
+#    q_num1  = opts.qnum
+#  else:
+      
+  print(" [+] detected interface: %s" % interface)
+
+  try:
+          q_num0 = sorted(os.listdir("/sys/class/net/")).index(interface) * 2
+            # for spoofing p0f:
+          q_num1 = sorted(os.listdir("/sys/class/net/")).index(interface) * 2 + 1
+  except ValueError, err:
+          q_num0 = -1
+          q_num1 = -1
+
   # Global -> get values from cb_nmap() and cb_p0f
   global base
 
-  if opts.os:
-    print " [+] Mutating to nmap:"
-    base = {}
-    if (opts.os == "random"):
-      base = get_names(get_random_os())
-    else:
-      base = get_names(opts.os)
-    if (not base):
-      print "      [->] \"%s\" could not be found in nmap database..." % opts.os
-      sys.exit(' [+] Aborting...')
+#  if opts.os:
+#    print " [+] Mutating to nmap:"
+#    base = {}
+#    if (opts.os == "random"):
+#      base = get_names(get_random_os())
+#    else:
+#      base = get_names(opts.os)
+#    if (not base):
+#      print "      [->] \"%s\" could not be found in nmap database..." % opts.os
+#      sys.exit(' [+] Aborting...')
 
   if (opts.osgenre):
     print " [+] Mutating to p0f:"
@@ -972,20 +1051,30 @@ def main():
   # Start activity
   print " [+] Activating queues"
   procs = []
-  # nmap mode
+  nmap_iptables_rules_added=False
+  p0f_iptables_rules_added=False
+  # nmap mode:
   if opts.os:  
     print (" [+] detected Queue %s" % q_num0)
     os.system("iptables -A INPUT -j NFQUEUE --queue-num %s" % q_num0) 
+    nmap_iptables_rules_added=True
     proc = Process(target=init,args=(q_num0,))
     procs.append(proc)
     proc.start() 
-  # p0f mode
+  # p0f mode:
+  iptables_conditions= [ 
+            ## SYN ( from client to WWW)
+            "-p TCP  -m multiport --dports 443,80 --syn -m comment --comment  Osfooler-ng ",
+            ## ACK ( from client to WWW)
+            #"-p TCP  -m multiport --dports 443,80 --tcp-flags SYN,ACK,FIN,RST ACK -m comment --comment  Osfooler-ng  "
+            ]
   if (opts.osgenre):
     global home_ip
     home_ip = get_ip_address(interface)  
     print (" [+] detected home_ip %s" % home_ip)
     print (" [+] detected Queue %s" % q_num1)
-    os.system("iptables -A OUTPUT -p TCP --syn -j NFQUEUE --queue-num %s" % q_num1) 
+    add_iptables_rules_p0f(iptables_conditions, q_num1)
+    p0f_iptables_rules_added=True
     proc = Process(target=init,args=(q_num1,))
     procs.append(proc)
     proc.start() 
@@ -999,20 +1088,34 @@ def main():
       if (q_num0 >= 0):
         os.system("iptables -D INPUT -j NFQUEUE --queue-num %s" % q_num0) 
       if (q_num1 >= 1):
-        os.system("iptables -D OUTPUT -p TCP --syn -j NFQUEUE --queue-num %s" % q_num1) 
+        del_iptables_rules_p0f(iptables_conditions, q_num1)
       print " [+] Active queues removed"
       print " [+] Exiting OSfooler..." 
   except KeyboardInterrupt:
       print
       # Flush all iptabels rules
-      if (q_num0 >= 0):
+      if (q_num0 >= 0) and nmap_iptables_rules_added==True:
+        print " [+] del nmap rules for Q", q_num0
         os.system("iptables -D INPUT -j NFQUEUE --queue-num %s" % q_num0) 
-      if (q_num1 >= 1):
-        os.system("iptables -D OUTPUT -p TCP --syn -j NFQUEUE --queue-num %s" % q_num1) 
-      print " [+] Active queues removed"
-      print " [+] Exiting OSfooler..."
+      if (q_num1 >= 1) and p0f_iptables_rules_added==True:
+        del_iptables_rules_p0f(iptables_conditions, q_num1)
+      print " [+] Active queues removed [kbd except]"
+      print " [+] Exiting OSfooler... [kbd except]"
       #for p in multiprocessing.active_children():
       #  p.terminate()
+
+def add_iptables_rules_p0f(iptables_conditions, q_num1 ):
+    for iptables_condition in iptables_conditions:
+        iptables_line="iptables -A OUTPUT %s -j NFQUEUE --queue-num %s" % ( iptables_condition , q_num1  )
+        print " [+] Queue %s, add iptables rule: %s" % (q_num1, iptables_line )
+        os.system( iptables_line )
+        
+def del_iptables_rules_p0f(iptables_conditions, q_num1 ):
+    for iptables_condition in iptables_conditions:
+        iptables_line="iptables -D OUTPUT %s -j NFQUEUE --queue-num %s" % ( iptables_condition , q_num1  )
+        print (" [+] Queue %s, del iptables rule: %s" % ( q_num1, iptables_line ) )
+        os.system( iptables_line )
+
 
 if __name__ == "__main__":
   main()
