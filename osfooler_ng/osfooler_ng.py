@@ -26,6 +26,7 @@ from multiprocessing import Process
 import scapy_p0f
 from scapy.layers.inet import IP,TCP
 from scapy_p0f import p0f, p0f_impersonate
+import yaml
 
 
 
@@ -37,6 +38,7 @@ sys.path.append('python')
 sys.path.append('build/python')
 sys.path.append('dpkt-1.6')
 
+SIGNATURES='/etc/p0f/p0f.yaml'
 # Initialize statistic variables
 icmp_packet = 0
 IPID = 0
@@ -147,7 +149,7 @@ def show_banner():
  /+/++:-/s+///:-`                     \/                             \/                     \/_____/ 
  `  `-///s:                           
       `-os.                           v1.0b (https://github.com/segofensiva/osfooler-ng)
-       /s:                                                                                                                                                   
+       /s:                            v1.0c (https://github.com/ezbik/osfooler-ng)
 """)
 
 # Which packet is?
@@ -692,28 +694,30 @@ def cb_p0f( pl ):
 
 
                     #sig='*:64:0:*:65535,4:mss,nop,ws,nop,nop,ts,sok,eol+1:df,id+:0' #mac os WORK
-                    sigs_my={
-                            "Android1":     '*:64:0:*:mss*44,1:mss,sok,ts,nop,ws:df,id+:0', #p0f3 compliant
-                            "Android2":     '*:64:0:*:mss*44,3:mss,sok,ts,nop,ws:df,id+:0', #p0f3 compliant
-                            "Android3":     '*:64:0:*:65535,8:mss,sok,ts,nop,ws:df,id+:0',  #p0f3 NOT compliant but modern!
-                            "ios":          '*:64:0:*:65535,2:mss,nop,ws,nop,nop,ts,sok,eol+1:df,id+:0', #   Mac OS X (iPhone or iPad)
-                            "macosx_1":     '*:64:0:*:65535,1:mss,nop,ws,nop,nop,ts,sok,eol+1:df,id+:0',
-                            "macosx_2":     '*:64:0:*:65535,3:mss,nop,ws,nop,nop,ts,sok,eol+1:df,id+:0',
-                            "macosx_3":     '*:64:0:*:65535,4:mss,nop,ws,nop,nop,ts,sok,eol+1:df,id+:0',
-                            "macosx_4":     '*:64:0:*:65535,6:mss,nop,ws,nop,nop,ts,sok,eol+1:df,id+:0',
-                            "win_1":        '*:128:0:*:8192,8:mss,nop,ws,nop,nop,sok:df,id+:0',
-                            "win_2":        '*:128:0:*:8192,0:mss,nop,nop,sok:df,id+:0',
-                            "win_3":        '*:128:0:*:8192,2:mss,nop,ws,nop,nop,sok:df,id+:0',
-                             }
+
+#                    sigs_my={
+#                            "Android1":     '*:64:0:*:mss*44,1:mss,sok,ts,nop,ws:df,id+:0', #p0f3 compliant
+#                            "Android2":     '*:64:0:*:mss*44,3:mss,sok,ts,nop,ws:df,id+:0', #p0f3 compliant
+#                            "Android3":     '*:64:0:*:65535,8:mss,sok,ts,nop,ws:df,id+:0',  #p0f3 NOT compliant but modern!
+#                            "ios":          '*:64:0:*:65535,2:mss,nop,ws,nop,nop,ts,sok,eol+1:df,id+:0', #   Mac OS X (iPhone or iPad)
+#                            "macosx_1":     '*:64:0:*:65535,1:mss,nop,ws,nop,nop,ts,sok,eol+1:df,id+:0',
+#                            "macosx_2":     '*:64:0:*:65535,3:mss,nop,ws,nop,nop,ts,sok,eol+1:df,id+:0',
+#                            "macosx_3":     '*:64:0:*:65535,4:mss,nop,ws,nop,nop,ts,sok,eol+1:df,id+:0',
+#                            "macosx_4":     '*:64:0:*:65535,6:mss,nop,ws,nop,nop,ts,sok,eol+1:df,id+:0',
+#                            "win_1":        '*:128:0:*:8192,8:mss,nop,ws,nop,nop,sok:df,id+:0',
+#                            "win_2":        '*:128:0:*:8192,0:mss,nop,nop,sok:df,id+:0',
+#                            "win_3":        '*:128:0:*:8192,2:mss,nop,ws,nop,nop,sok:df,id+:0',
+#                             }
                 
                     #                                                    incolumi    valdik  brows/lea  whoer 
                     #sig='*:64:0:*:mss*44,1:mss,sok,ts,nop,ws:df,id+:0' # Lin         Andr   Andr       Andr
                     #sig='*:64:0:*:mss*44,3:mss,sok,ts,nop,ws:df,id+:0'  # Lin         Andr   Andr       Andr
                     #sig='*:64:0:*:65535,8:mss,sok,ts,nop,ws:df,id+:0'   # A         L       L           ?
 
-                    sig_name="win_1"
-                    sig=sigs_my[sig_name]
+                    #sig_name="win_1"
+                    #sig=sigs_my[sig_name]
 
+                    if opts.verbose: print " [+] dest sig",sig
 
                     try:
                         pkt_send = scapy_p0f.p0f_impersonate(IP(dst=inet_ntoa(pkt.dst), src=inet_ntoa(pkt.src), id=pkt.id, tos=pkt.tos)/TCP( sport=pkt.tcp.sport, dport=pkt.tcp.dport, flags=tcp_flag_my , seq=pkt.tcp.seq, ack=0 , options=TCP_OPTS ), signature=sig, verbose=scapy_verbose )
@@ -871,7 +875,7 @@ def init(queue):
   if (queue % 2 ==  0):
     q.bind(queue, cb_nmap)
     print "      [->] %s: nmap packet processor" % multiprocessing.current_process().name
-  if (queue % 2 ==  1 and (opts.osgenre or (opts.details_p0f and opts.osgenre))):
+  if (queue % 2 ==  1 and (opts.details_p0f and opts.osgenre)):
     q.bind(queue, cb_p0f)
     print "      [->] %s: p0f packet processor" % multiprocessing.current_process().name
   try: 
@@ -932,11 +936,11 @@ def main():
   parser.add_option('-m', '--os_nmap', action='store',
                     dest='os', help="use nmap Operating System")
   parser.add_option('-p', '--p0f', action='store_true',
-                    dest='p0f', help="list available p0f v2 signatures")
+                    dest='p0f', help="list available p0f signatures")
   parser.add_option('-o', '--os_p0f', action='store',
-                    dest='osgenre', help="use p0f v2 OS Genre")
+                    dest='osgenre', help="use p0f OS Genre")
   parser.add_option('-d', '--details_p0f',
-                    action='store', dest='details_p0f', help="choose p0f v2 Details")
+                    action='store', dest='details_p0f', help="choose p0f Details")
   parser.add_option('-i', '--interface', action='store',
                     dest='interface', help="choose network interface (eth0)")
   parser.add_option('-s', '--search', action='store',
@@ -963,22 +967,18 @@ def main():
     exit(0)
 
   if opts.nmap:
-    print(" [+] Please, select nmap OS to emulate")
+    print(" [+] Supported list of nmap OS to emulate")
     list_os()
     exit(0)
 
   if opts.p0f:
-    print("Please, select p0f OS Genre and Details")
-    db = module_p0f.p0f_kdb.get_base()
-    for i in range(0, 250):
-      print "\tOS Genre=\"%s\" Details=\"%s\"" % (db[i][6], db[i][7])
-    exit(0)
-
-  if not opts.os and (not (opts.details_p0f and not opts.osgenre)) and (not opts.osgenre):
-    print " [ERROR] Please, choose a nmap or p0f OS system to emulate"
-    print " [+] Use %s -h to get more information" % sys.argv[0]
+    print " [+] Supported list of p0f OS to emulate, from ",SIGNATURES,"file; use any in '-o XXX', '-d YYY' flags"
     print
-    sys.exit(' [+] Aborting...')
+    signatures=load_signatures()
+    for osgenre, v in signatures.iteritems():
+      for osdetails, s in v.iteritems():
+        print "%s   %s    %s" % (osgenre,osdetails, s)
+    exit(0)
 
   if (opts.details_p0f and not opts.osgenre):
     print " [ERROR] Please, choose p0f OS system to emulate, not only OS details"
@@ -1023,30 +1023,19 @@ def main():
 #      print "      [->] \"%s\" could not be found in nmap database..." % opts.os
 #      sys.exit(' [+] Aborting...')
 
-  if (opts.osgenre):
+  if opts.osgenre and opts.osgenre:
     print " [+] Mutating to p0f:"
-    db = module_p0f.p0f_kdb.get_base()
-    exists = 0
-    if (opts.osgenre == "random"):
-      rand_os = randint(0,250)
-      opts.osgenre = db[rand_os][6]
-    if (not opts.details_p0f):
-      for i in range(0, 250):
-        if (db[i][6] == opts.osgenre):
-          print "      WWW:%s|TTL:%s|D:%s|SS:%s|OOO:%s|QQ:%s|OS:%s|DETAILS:%s" % (db[i][0],db[i][1],db[i][2],db[i][3],db[i][4],db[i][5],db[i][6],db[i][7])
-          exists = 1
-    if (opts.details_p0f):
-      for i in range(0, 250):
-        if (db[i][6] == opts.osgenre and db[i][7] == opts.details_p0f):
-          print "      WWW:%s|TTL:%s|D:%s|SS:%s|OOO:%s|QQ:%s|OS:%s|DETAILS:%s" % (db[i][0],db[i][1],db[i][2],db[i][3],db[i][4],db[i][5],db[i][6],db[i][7])
-          exists = 1
-          break
-    if (not exists):
+    global sig
+    sig=load_signature(opts.osgenre, opts.details_p0f)
+
+    if sig: 
+      print "      OS: %s:%s, with signature %s"  % (opts.osgenre , opts.details_p0f, sig)
+    else:
       print "      [->] Could not found that combination in p0f database..."
       sys.exit(' [+] Aborting...')
-
-  if (not opts.details_p0f and opts.osgenre):
-      print " [i] You've only selected p0f OS genre. Details will be chosen randomly every packet from the list bellow"
+  else:
+    print " [i] You've only selected p0f OS genre, also select OS details."
+    sys.exit(' [+] Aborting...')
   
   # Start activity
   print " [+] Activating queues"
@@ -1115,6 +1104,23 @@ def del_iptables_rules_p0f(iptables_conditions, q_num1 ):
         iptables_line="iptables -D OUTPUT %s -j NFQUEUE --queue-num %s" % ( iptables_condition , q_num1  )
         print (" [+] Queue %s, del iptables rule: %s" % ( q_num1, iptables_line ) )
         os.system( iptables_line )
+
+def load_signatures( ):
+    with open(SIGNATURES, 'r') as stream:
+        try:
+            parsed_yaml=yaml.load(stream, Loader=yaml.BaseLoader )
+        except yaml.YAMLError as exc:
+            print(exc)
+    return parsed_yaml
+
+def load_signature( osgenre, details_p0f ):
+    parsed_yaml=load_signatures()
+    #print "signatures loaded", parsed_yaml
+    #print "trying to load sig by", osgenre, details_p0f
+    ret=parsed_yaml[osgenre][details_p0f]
+    if ret:
+        return ret
+    
 
 
 if __name__ == "__main__":
