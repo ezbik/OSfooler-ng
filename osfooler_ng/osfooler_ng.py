@@ -932,7 +932,7 @@ def main():
   show_banner()
   parser = optparse.OptionParser()
   parser.add_option('-M', '--marked', action='store',
-                    dest='marked', help="process only packets with FWMARK, can be 0x3e8 or 1000")
+                    dest='marked', help="process only packets with FWMARK, can be 1000 (dec) or (hex) 0x3e8 or value/mask")
   parser.add_option('-q', '--qnum', action='store',
                     dest='qnum', help="NFQUEUE id to use")
   parser.add_option('-n', '--nmap', action='store_true',
