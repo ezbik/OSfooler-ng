@@ -1058,6 +1058,8 @@ def main():
   if opts.marked:
     print (" [+] will process only packets marked as %s" % opts.marked)
     I_MARK="-m mark --mark  %s" % opts.marked
+  else:
+    I_MARK=""
 
   iptables_conditions= [ 
             ## SYN ( from client to WWW)
