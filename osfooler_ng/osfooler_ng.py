@@ -931,6 +931,10 @@ def main():
   # Main program begins here
   show_banner()
   parser = optparse.OptionParser()
+  parser.add_option('-M', '--marked', action='store',
+                    dest='marked', help="process only packets with FWMARK, can be 0x3e8 or 1000")
+  parser.add_option('-q', '--qnum', action='store',
+                    dest='qnum', help="NFQUEUE id to use")
   parser.add_option('-n', '--nmap', action='store_true',
                     dest='nmap', help="list available nmap signatures")
   parser.add_option('-m', '--os_nmap', action='store',
@@ -994,20 +998,20 @@ def main():
   else:
     interface = get_default_iface_name_linux()
 
-#  if opts.qnum:
-#    q_num0  = opts.qnum
-#    q_num1  = opts.qnum
-#  else:
-      
   print(" [+] detected interface: %s" % interface)
 
-  try:
-          q_num0 = sorted(os.listdir("/sys/class/net/")).index(interface) * 2
-            # for spoofing p0f:
-          q_num1 = sorted(os.listdir("/sys/class/net/")).index(interface) * 2 + 1
-  except ValueError, err:
-          q_num0 = -1
-          q_num1 = -1
+  if opts.qnum:
+    q_num0  = int(opts.qnum)
+    q_num1  = int(opts.qnum)
+  else:
+      
+      try:
+              q_num0 = sorted(os.listdir("/sys/class/net/")).index(interface) * 2
+                # for spoofing p0f:
+              q_num1 = sorted(os.listdir("/sys/class/net/")).index(interface) * 2 + 1
+      except ValueError, err:
+              q_num0 = -1
+              q_num1 = -1
 
   # Global -> get values from cb_nmap() and cb_p0f
   global base
@@ -1051,11 +1055,14 @@ def main():
     procs.append(proc)
     proc.start() 
   # p0f mode:
+  if opts.marked:
+    print (" [+] will process only packets marked as %s" % opts.marked)
+    I_MARK="-m mark --mark  %s" % opts.marked
+
   iptables_conditions= [ 
             ## SYN ( from client to WWW)
-            "-p TCP  -m multiport --dports 443,80 --syn -m comment --comment  Osfooler-ng ",
-            ## ACK ( from client to WWW)
-            #"-p TCP  -m multiport --dports 443,80 --tcp-flags SYN,ACK,FIN,RST ACK -m comment --comment  Osfooler-ng  "
+            #"-p TCP  -m multiport --dports 443,446,80 --syn -m comment --comment  Osfooler-ng ",
+            "-p TCP  -m multiport --dports 443,446,80 --syn %s -m comment --comment  Osfooler-ng " % I_MARK,
             ]
   if (opts.osgenre):
     global home_ip
