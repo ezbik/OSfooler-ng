@@ -876,10 +876,10 @@ def cb_nmap( pl):
 
 def init(queue):
   q = nfqueue.NetfilterQueue()
-  if (queue % 2 ==  0):
+  if (opts.os):
     q.bind(queue, cb_nmap)
     print "      [->] %s: nmap packet processor" % multiprocessing.current_process().name
-  if (queue % 2 ==  1 and (opts.details_p0f and opts.osgenre)):
+  if (opts.details_p0f and opts.osgenre):
     q.bind(queue, cb_p0f)
     print "      [->] %s: p0f packet processor" % multiprocessing.current_process().name
   try: 
