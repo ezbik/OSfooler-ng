@@ -671,6 +671,10 @@ def cb_p0f( pl ):
 
                     option_list = tcp.parse_opts(pkt.tcp.opts)
 
+                    # when we set: sysctl -w net.ipv4.tcp_timestamps=0
+                    ts1=0
+                    ts2=0
+
                     # we can retrieve TS only for SYN packets??
                     for o, v in option_list:
                      if o == TCP_OPT_TIMESTAMP:
