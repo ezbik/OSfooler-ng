@@ -1,6 +1,8 @@
 #!/usr/bin/python2
 # -*- coding: utf-8 -*-
 
+# ver:2023-10-23
+
 from random import randint
 import hashlib
 import logging
