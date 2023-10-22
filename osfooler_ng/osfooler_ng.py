@@ -942,7 +942,7 @@ def main():
   parser.add_option('--cgroup_classid', action='store', dest='cgroup_classid', 
                     help="process only packets coming from this Cgroup classid. Example: 1000 (dec) or 0x3e8 (hex). Make sure this Cgroup already exists!")
   parser.add_option('--cgroup_path', action='store', dest='cgroup_path', 
-                    help="process only packets coming from this Cgroup paths (comma separated). Example: kek.slice/my.service . Take it from output of systemctl status my.service . Make sure this Cgroup already exists! ")
+                    help="process only packets coming from this Cgroup paths (comma separated). Example: kek.slice/my.service,kek.slice/my2.service . Make sure these Cgroup paths already exist! ")
   parser.add_option('-q', '--qnum', action='store',
                     dest='qnum', help="NFQUEUE id to use")
   parser.add_option('-n', '--nmap', action='store_true',
