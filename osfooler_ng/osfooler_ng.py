@@ -1,7 +1,7 @@
 #!/usr/bin/python2
 # -*- coding: utf-8 -*-
 
-# ver:2023-10-23
+# ver:2023-10-23__2
 
 from random import randint
 import hashlib
@@ -942,7 +942,7 @@ def main():
   parser.add_option('--cgroup_classid', action='store', dest='cgroup_classid', 
                     help="process only packets coming from this Cgroup classid. Example: 1000 (dec) or 0x3e8 (hex). Make sure this Cgroup already exists!")
   parser.add_option('--cgroup_path', action='store', dest='cgroup_path', 
-                    help="process only packets coming from this Cgroup path. Example: kek.slice/my.service . Take it from output of systemctl status my.service . Make sure this Cgroup already exists! ")
+                    help="process only packets coming from this Cgroup paths (comma separated). Example: kek.slice/my.service . Take it from output of systemctl status my.service . Make sure this Cgroup already exists! ")
   parser.add_option('-q', '--qnum', action='store',
                     dest='qnum', help="NFQUEUE id to use")
   parser.add_option('-n', '--nmap', action='store_true',
@@ -1065,23 +1065,24 @@ def main():
     procs.append(proc)
     proc.start() 
   # p0f mode:
+
+  iptables_conditions=[]
+  rule1="-p TCP  -m multiport --dports 443,446,80 --syn -m comment --comment Osfooler-ng "
+
   if opts.marked:
     print (" [+] will process only packets marked as %s" % opts.marked)
-    I_MARK="-m mark --mark  %s" % opts.marked
+    iptables_conditions.append( rule1+ "-m mark --mark  %s" % opts.marked )
   elif opts.cgroup_path:
     print (" [+] will process only packets from Cgroup Path  %s" % opts.cgroup_path)
-    I_MARK="-m cgroup --path %s" % opts.cgroup_path
+    for i in opts.cgroup_path.split(","):
+        iptables_conditions.append( rule1+"-m cgroup --path %s" % i )
   elif opts.cgroup_classid:
     print (" [+] will process only packets from Cgroup classid  %s" % opts.cgroup_classid)
-    I_MARK="-m cgroup --classid %s" % opts.cgroup_classid
+    iptables_conditions.append( rule1+"-m cgroup --classid %s" % opts.cgroup_classid)
   else:
-    I_MARK=""
+    print (" [+] will process all system packets")
+    iptables_conditions.append(rule1)
 
-  iptables_conditions= [ 
-            ## SYN ( from client to WWW)
-            #"-p TCP  -m multiport --dports 443,446,80 --syn -m comment --comment  Osfooler-ng ",
-            "-p TCP  -m multiport --dports 443,446,80 --syn %s -m comment --comment  Osfooler-ng " % I_MARK,
-            ]
   if (opts.osgenre):
     global home_ip
     home_ip = get_ip_address(interface)  
