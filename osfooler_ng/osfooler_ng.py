@@ -1119,8 +1119,11 @@ def main():
 def add_iptables_rules_p0f(iptables_conditions, q_num1 ):
     for iptables_condition in iptables_conditions:
         iptables_line="iptables -A OUTPUT %s -j NFQUEUE --queue-num %s" % ( iptables_condition , q_num1  )
-        print " [+] Queue %s, add iptables rule: %s" % (q_num1, iptables_line )
-        os.system( iptables_line )
+        print " [+] Queue %s, add iptables rule: \n   %s" % (q_num1, iptables_line )
+        ret=os.system( iptables_line )
+        if ret != 0:
+            print " [+] could not add Iptables rule"
+        sys.exit(' [+] Aborting...')
         
 def del_iptables_rules_p0f(iptables_conditions, q_num1 ):
     for iptables_condition in iptables_conditions:
