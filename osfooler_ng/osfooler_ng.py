@@ -1126,6 +1126,7 @@ def add_iptables_rules_p0f(iptables_conditions, q_num1 ):
         ret=os.system( iptables_line )
         if ret != 0:
             print " [+] could not add Iptables rule"
+            del_iptables_rules_p0f(iptables_conditions, q_num1 )
             sys.exit(' [+] Aborting...')
         
 def del_iptables_rules_p0f(iptables_conditions, q_num1 ):
