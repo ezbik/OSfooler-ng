@@ -938,9 +938,9 @@ def main():
   parser.add_option('-M', '--marked', action='store', dest='marked', 
                     help="process only packets with FWMARK, can be 1000 (dec) or (hex) 0x3e8 or value/mask")
   parser.add_option('--cgroup_classid', action='store', dest='cgroup_classid', 
-                    help="process only packets coming from this Cgroup classid. Example: 1000 (dec) or 0x3e8 (hex)")
+                    help="process only packets coming from this Cgroup classid. Example: 1000 (dec) or 0x3e8 (hex). Make sure this Cgroup already exists!")
   parser.add_option('--cgroup_path', action='store', dest='cgroup_path', 
-                    help="process only packets coming from this Cgroup path. Example: proxy.slice ")
+                    help="process only packets coming from this Cgroup path. Example: kek.slice/my.service . Take it from output of systemctl status my.service . Make sure this Cgroup already exists! ")
   parser.add_option('-q', '--qnum', action='store',
                     dest='qnum', help="NFQUEUE id to use")
   parser.add_option('-n', '--nmap', action='store_true',
@@ -1066,10 +1066,10 @@ def main():
   if opts.marked:
     print (" [+] will process only packets marked as %s" % opts.marked)
     I_MARK="-m mark --mark  %s" % opts.marked
-  else if opts.cgroup_path:
+  elif opts.cgroup_path:
     print (" [+] will process only packets from Cgroup Path  %s" % opts.cgroup_path)
     I_MARK="-m cgroup --path %s" % opts.cgroup_path
-  else if opts.cgroup_classid:
+  elif opts.cgroup_classid:
     print (" [+] will process only packets from Cgroup classid  %s" % opts.cgroup_classid)
     I_MARK="-m cgroup --classid %s" % opts.cgroup_classid
   else:
