@@ -1,0 +1,15 @@
+
+[Unit]
+After=network.target
+
+[Service]
+ExecStart=/usr/local/bin/osfooler-ng  -o ${OSGENRE} -d ${DETAILS_P0F}
+Type=simple
+EnvironmentFile=/etc/osfooler-ng.conf
+KillMode=mixed
+TimeoutStopSec=2
+KillSignal=SIGINT
+
+[Install]
+WantedBy=default.target
+
