@@ -2,3 +2,4 @@ dpkt==1.9.8
 scapy==2.4.5
 NetfilterQueue==0.9.0
 PyYAML>=5.2
+pyp0f==0.3.0
