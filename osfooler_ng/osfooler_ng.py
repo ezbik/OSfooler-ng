@@ -463,6 +463,8 @@ def main():
   # Main program begins here
   show_banner()
   parser = optparse.OptionParser()
+  parser.add_option('-I', '--skip-iptables', action='store_true', dest='skip_iptables', 
+                    help="Skip adding iptables rules")
   parser.add_option('-M', '--marked', action='store', dest='marked', 
                     help="process only packets with FWMARK, can be 1000 (dec) or (hex) 0x3e8 or value/mask")
   parser.add_option('--cgroup_classid', action='store', dest='cgroup_classid', 
@@ -507,6 +509,11 @@ def main():
     print()
     sys.exit(' [+] Aborting...')
 
+  if opts.skip_iptables:
+    skip_iptables=True
+  else:
+    skip_iptables=False
+
   # Check if user is root before continue
   user_is_root()
 
@@ -546,34 +553,37 @@ def main():
   print( " [+] Activating queues")
   procs = []
   
-  p0f_iptables_rules_added=False
-
   # p0f mode:
 
-  iptables_conditions=[]
-  rule1="-p TCP  -m multiport --dports 443,446,80 --syn -m comment --comment Osfooler-ng "
-
-  if opts.marked:
-    print( (" [+] will process only packets marked as %s" % opts.marked))
-    iptables_conditions.append( rule1+ "-m mark --mark  %s" % opts.marked )
-  elif opts.cgroup_path:
-    print( (" [+] will process only packets from Cgroup Path  %s" % opts.cgroup_path))
-    for i in opts.cgroup_path.split(","):
-        iptables_conditions.append( rule1+"-m cgroup --path %s" % i )
-  elif opts.cgroup_classid:
-    print( (" [+] will process only packets from Cgroup classid  %s" % opts.cgroup_classid))
-    iptables_conditions.append( rule1+"-m cgroup --classid %s" % opts.cgroup_classid)
+  
+  if skip_iptables:
+    print(" [+] Skip adding iptables rules, but you can divert traffic to this NFQUEUE ID, example: ")
+    print("     iptables -A OUTPUT -p tcp --syn -j NFQUEUE --queue-num %s" % q_num1 )
   else:
-    print( (" [+] will process all system packets"))
-    iptables_conditions.append(rule1)
+      iptables_conditions=[]
+      rule1="-p TCP  -m multiport --dports 443,446,80 --syn -m comment --comment Osfooler-ng "
+
+      if opts.marked:
+        print( (" [+] will process only packets marked as %s" % opts.marked))
+        iptables_conditions.append( rule1+ "-m mark --mark  %s" % opts.marked )
+      elif opts.cgroup_path:
+        print( (" [+] will process only packets from Cgroup Path  %s" % opts.cgroup_path))
+        for i in opts.cgroup_path.split(","):
+            iptables_conditions.append( rule1+"-m cgroup --path %s" % i )
+      elif opts.cgroup_classid:
+        print( (" [+] will process only packets from Cgroup classid  %s" % opts.cgroup_classid))
+        iptables_conditions.append( rule1+"-m cgroup --classid %s" % opts.cgroup_classid)
+      else:
+        print( (" [+] will process all system packets"))
+        iptables_conditions.append(rule1)
 
   if (opts.osgenre):
     #global home_ip
     #home_ip = get_ip_address(interface)  
     #print( (" [+] detected home_ip %s" % home_ip))
     print( (" [+] detected Queue %s" % q_num1))
-    add_iptables_rules_p0f(iptables_conditions, q_num1)
-    p0f_iptables_rules_added=True
+    if not skip_iptables:
+        add_iptables_rules_p0f(iptables_conditions, q_num1)
     proc = Process(target=init,args=(q_num1,))
     procs.append(proc)
     proc.start() 
@@ -591,8 +601,11 @@ def main():
   except KeyboardInterrupt:
       print()
       # Flush all iptabels rules
-      if (q_num1 >= 1) and p0f_iptables_rules_added==True:
-        del_iptables_rules_p0f(iptables_conditions, q_num1)
+      if (q_num1 >= 1):
+        if skip_iptables:
+            print(" [+] Skip deleting iptables rules")
+        else :
+            del_iptables_rules_p0f(iptables_conditions, q_num1)
       print( " [+] Active queues removed [kbd except]")
       print( " [+] Exiting OSfooler... [kbd except]")
       #for p in multiprocessing.active_children():
