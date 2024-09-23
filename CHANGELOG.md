@@ -10,3 +10,6 @@
     * added --cgroup_path option, so we will process only packets with specified Cgroup Path.
     * see --help for more info
 
+2024-04-01
+    
+    * rewritten for Python3
