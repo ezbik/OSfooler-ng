@@ -1,4 +1,4 @@
-#!/opt/osfooler-ng/bin/python3
+#!/usr/bin/python3
 # -*- coding: utf-8 -*-
 
 # ver:2024-03-14__py3
