@@ -16,4 +16,5 @@
 
 2024-09-24
 
-    * added -I for skipping adding iptables rules
+    * added -I for skipping adding iptables rules by the Osfooler, instead, you have to redirect some packets
+      by iptables to the desired NFQUEUE id.
