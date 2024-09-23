@@ -1,12 +1,12 @@
-#!/usr/bin/python2
+#!/opt/osfooler-ng/bin/python3
 # -*- coding: utf-8 -*-
 
-# ver:2023-10-23__2
+# ver:2024-03-14__py3
 
 from random import randint
 import hashlib
 import logging
-import module_p0f
+#import module_p0f
 import socket
 import fcntl
 import struct
@@ -15,25 +15,30 @@ import sys
 import time
 import os
 import netfilterqueue as nfqueue
-import ConfigParser
+#import ConfigParser
 import ast
 l = logging.getLogger("scapy.runtime").setLevel(logging.ERROR)
 from scapy.all import *
-from dpkt import *
+#from dpkt import *
+import dpkt
 from socket import AF_INET, AF_INET6, inet_ntoa
 import urllib
 import multiprocessing
 from multiprocessing import Process
 
-import scapy_p0f
 from scapy.layers.inet import IP,TCP
+import scapy_p0f
 from scapy_p0f import p0f, p0f_impersonate
+
+#from pyp0f.net.layers.tcp import TCPFlag
+#from pyp0f.impersonate import impersonate_mtu, impersonate_tcp
 import yaml
+import codecs
 
 
 
 # Some configuration
-sys.tracebacklimit = 0
+#sys.tracebacklimit = 3
 conf.verbose = 0
 conf.L3socket = L3RawSocket
 sys.path.append('python')
@@ -46,7 +51,6 @@ icmp_packet = 0
 IPID = 0
 
 # Started NFQueues
-q_num0 = -1
 q_num1 = -1
 
 # TCP packet information
@@ -118,18 +122,11 @@ udp_payload = "CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC
 
 # Parse fields in nmap-db
 def parse_nmap_field(field):
-  if (field.find('|') != -1):
-    # Choose randomly one value :)
-    list = field.split("|")
-    # Filter any empty string
-    list = filter (None,list)
-    result = random.choice(list)
-  else:
-    result = field
-  return result
+  raise Exception("Function dropped")
 
 # Get default interface address without external packages
 def get_ip_address(ifname):
+  raise Exception("Function dropped")
   s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
   return socket.inet_ntoa(fcntl.ioctl(
     s.fileno(),
@@ -138,20 +135,20 @@ def get_ip_address(ifname):
     )[20:24])
 
 def show_banner():
-	print ("""\
+	print ("""
 		
                  -o:      
                 .o+`      
                 :o-.-.` ``
           `-::::+o/-:++/o/	          _____             __                                        
-        `/+//+/--ss///:-.    ____  ______/ ________   ____ |  |   ___________            ____   ____  
-        /o:` .:/:ss         /  _ \/  ___\   __/  _ \ /  _ \|  | _/ __ \_  __ \  ______  /    \ / ___\ 
-        oo`.-` .+s+        (  <_> \___ \ |  |(  <_> (  <_> |  |_\  ___/|  | \/ /_____/ |   |  / /_/  >
-  .-::::oo--/+/+o/`         \____/____  >|__| \____/ \____/|____/\___  |__|            |___|  \___  / 
- /+/++:-/s+///:-`                     \/                             \/                     \/_____/ 
+        `/+//+/--ss///:-.    ____  ______/ ________   ____ |  |   ___________            ____   ____ 
+        /o:` .:/:ss         /  _ \\/  ___\\   __/  _ \\ /  _ \\|  | _/ __ \\_  __ \\  ______  /    \\ / ___\\
+        oo`.-` .+s+        (  <_> \\___ \\ |  |(  <_> (  <_> |  |_\\  ___/|  | \\/ /_____/ |   |  / /_/  >
+  .-::::oo--/+/+o/`         \\____/____  >|__| \\____/ \\____/|____/\\___  |__|            |___|  \\___  /
+ /+/++:-/s+///:-`                     \\/                             \\/                     \\/_____/
  `  `-///s:                           
       `-os.                           v1.0b (https://github.com/segofensiva/osfooler-ng)
-       /s:                            v1.0c (https://github.com/ezbik/osfooler-ng)
+       /s:                            v1.0d (https://github.com/ezbik/osfooler-ng)
 """)
 
 # Which packet is?
@@ -200,369 +197,50 @@ def opts_human(options):
 
 # GET IP ID ICMP
 def get_icmp_ipid():
-  for x in range(0, len(base["SEQ"])):
-    if (base["SEQ"][x][0] == "CI"):
-      icmp_ipid = base["SEQ"][x][1]
+  raise Exception("Function dropped")
 
 #
 def get_ipid_new(test):
-  i = 1
-  for x in range(0, len(base["SEQ"])):
-    if (base["SEQ"][x][0] == test):
-      if base["SEQ"][x][1] == "Z":
-        i = 0
-      elif base["SEQ"][x][1] == "RD":
-        i = 0
-        while (i < 20000):
-          i = randint(1, 65535)
-      elif base["SEQ"][x][1] == "RI":
-        i = randint(1, 1500)
-        while (i < 1000) or (i % 256 == 0):
-          i = randint(1, 1500)
-          #print "%s" % i
-      elif base["SEQ"][x][1] == "BI":
-        i = randint(1, 5120)
-        while (i % 256 != 0):
-          i = randint(1, 5120)
-      elif base["SEQ"][x][1] == "I":
-        i = randint(0, 9)
-      else:
-        IPID = randint(1, 65535)
-  return i
+  raise Exception("Function dropped")
 
 # Send ICMP response
 def send_icmp_response(pl, probe):
-  global icmp_packet
-  global icmp_ipid 
-  pkt = ip.IP(pl.get_payload())
-  # DON'T FRAGMENT ICMP (DFI)
-  if (base[probe][0][1] == "N"):
-    frag_bit = 0  # None have it activated
-  elif (base[probe][0][1] == "S"):
-    if (check_even(icmp_packet)):
-      frag_bit = 2  # First without DF
-    else:
-      rag_bit = 0  # Second one with DF
-  elif (base[probe][0][1] == "Y"):
-    frag_bit = 2  # Both have DF bit active
-  else:
-    if (check_even(icmp_packet)):
-      frag_bit = 0  # First without DF
-    else:
-      frag_bit = 2  # Second one with DF
-  
-  TG = int(base[probe][2][1], 16)
-  # ICMP response code (CD)
-  if (base[probe][3][1] == "Z"):
-    code = 0  # Both have 0 value
-  elif (base[probe][3][1] == "S"):
-    code = pkt.icmp.code  # Same as received in the original packet
-  elif (base[probe][3][1] == "00"):  # nn
-    code = 1
-  else:
-    code = 0  # Any other combo
-    # TODO
-    # any other combo
-    icmp_packet = icmp_packet + 1
-    inc_ipid = get_ipid_new("II")
-    if (inc_ipid):
-        icmp_ipid = icmp_ipid + inc_ipid
-    else:
-        icmp_ipid = icmp_ipid + randint(50, 100)
-    if (icmp_ipid > 65535):
-        icmp_ipid = icmp_ipid - 65535
-    send(IP(id=icmp_ipid, dst=inet_ntoa(pkt.src), src=inet_ntoa(pkt.dst), flags=frag_bit, ttl=TG)
-       / ICMP(id=pkt.icmp.data.id, seq=pkt.icmp.data.seq, code=code, type=0), verbose=0)
+  raise Exception("Function dropped")
 
 # Send UDP response
 def send_udp_response(pl, probe): 
-  pkt = ip.IP(pl.get_payload())
-  if (base[probe][0][1] == "Y"):
-    frag_bit = 2
-  else:
-    frag_bit = 0
-  TG = int(base[probe][2][1], 16)
-  IPL = int(base[probe][3][1], 16)
-  FIELD = int(base[probe][4][1])
-  send(IP(dst=inet_ntoa(pkt.src), src=inet_ntoa(pkt.dst), ttl=TG, flags=frag_bit) / ICMP(code=3, type=3) /
-    IP(dst=inet_ntoa(pkt.dst), src=inet_ntoa(pkt.src), id=pkt.id, ttl=TG - 1) / UDP(dport=pkt.udp.dport, sport=pkt.udp.sport), verbose=0)
+  raise Exception("Function dropped")
 
 # Send probe response
 def send_probe_response(pl, probe):
-  global IPID 
-  pkt = ip.IP(pl.get_payload())
-  # IP DON'T FRAGMENT BIT (DF)
-  if (base[probe][1][1] == "Y"):
-    frag_bit = 2
-  else:
-    frag_bit = 0
-  TG = int(base[probe][3][1], 16)
-  # TCP INITICIAL WINDOW SIZE (W)
-  W = parse_nmap_field(base[probe][4][1])
-  if ( W != "N"):
-    W = int(W, 16)
-  else :
-    W = None
-  # TCP SEQUENCE NUMBER (S)
-  if base[probe][5][1] == "Z":
-    SEQ = 0
-  elif base[probe][5][1] == "A":
-    SEQ = int(pkt.tcp.ack)
-  elif base[probe][5][1] == "A+":
-    SEQ = int(pkt.tcp.ack)
-    SEQ = SEQ + 1
-  else:
-    SEQ = randint(1, 65535)
-  # TCP ACKNOWLEDGMENT NUMBER (A)
-  if base[probe][6][1] == "Z":
-    ACK = 0
-  elif base[probe][6][1] == "S":
-    ACK = int(pkt.tcp.seq)
-  elif base[probe][6][1] == "S+":
-    ACK = int(pkt.tcp.seq)
-    ACK = ACK + 1
-  else:
-    ACK = randint(1, 65535)
-  # TCP FLAGS (F)
-  FLAGS = base[probe][7][1]
-  # TCP OPTIONS
-  opts = []
-  opts = options_to_scapy(parse_nmap_field(base[probe][8][1]))
-  # TODO
-  # TCP RST DATA CHECKSUM
-  # TODO
-  # TCP MISCELLANEOUS QUIRKS
-  # IPID INCREMENTS
-  inc_ipid = get_ipid_new("CI")
-  if (inc_ipid):
-    IPID = IPID + inc_ipid
-  else:
-    IPID = IPID + randint(50, 100)
-  if (IPID > 65535):
-    IPID = IPID - 65535
-  send(IP(id=IPID, dst=inet_ntoa(pkt.src), src=inet_ntoa(pkt.dst), flags=frag_bit, ttl=TG) /
-     TCP(sport=pkt.tcp.dport, dport=pkt.tcp.sport, seq=SEQ, ack=ACK, window=W, options=opts, flags=FLAGS), verbose=0)
+  raise Exception("Function dropped")
 
 # ECN
 # Send probe response
 def send_ECN_response(pl, probe):
-    global IPID 
-    pkt = ip.IP(pl.get_payload())
-    # IP DON'T FRAGMENT BIT (DF)
-    df_parsed = parse_nmap_field(base[probe][1][1])
-    if (df_parsed == "Y"):
-        frag_bit = 2
-    else:
-        frag_bit = 0
-    # IP INITIAL TIME-TO-LIVE (T)
-    ttl_parsed = parse_nmap_field(base[probe][2][1])
-    if ttl_parsed.find("-"):
-        T = int(ttl_parsed[3:], 16)
-    else:
-        T = int(ttl_parsed)
-    # IP INITIAL TIME-TO-LIVE GUESS (TG)
-    TG = int(parse_nmap_field(base[probe][3][1]), 16)
-    # TCP INITICIAL WINDOW SIZE (W)
-    W = parse_nmap_field(base[probe][4][1])
-    if ( W != "N"):
-      W = int(W, 16)
-    else :
-      W = None
-    # TCP OPTIONS
-    if (base[probe][5][0] == "O"):
-      opts = []
-      opts = options_to_scapy(parse_nmap_field(base[probe][5][1]))
-      if (base[probe][6][1] == "Y"):
-        FLAGS = "E"
-      elif (base[probe][6][1] == "N"):
-        FLAGS = ""
-      elif (base[probe][6][1] == "S"):
-        FLAGS = "CE"
-      else:
-        FLAGS = "C"
-    elif (base[probe][5][0] == "CC"):
-      opts = []
-      flags_parsed = parse_nmap_field(base[probe][5][1])
-      if (flags_parsed == "Y"):
-        FLAGS = "E"
-      elif (flags_parsed == "N"):
-       FLAGS = ""
-      elif (flags_parsed == "S"):
-       FLAGS = "CE"
-      else:
-       FLAGS = "C"
-    # TODO
-    # TCP RST DATA CHECKSUM (CC)
-    # TODO
-    # TCP MISCELLANEOUS QUIRKS
-    # IPID INCREMENTS
-    inc_ipid = get_ipid_new("CI")
-    if (inc_ipid):
-      IPID = IPID + inc_ipid
-    else:
-      IPID = IPID + randint(50, 100)
-    if (IPID > 65535):
-      IPID = IPID - 65535
-    send(IP(id=IPID, dst=inet_ntoa(pkt.src), src=inet_ntoa(pkt.dst), flags=frag_bit, ttl=TG) /
-      TCP(sport=pkt.tcp.dport, dport=pkt.tcp.sport, window=W, options=opts, flags=FLAGS), verbose=0)
+  raise Exception("Function dropped")
 
 def send_probe_response_T1(pl, probe, packet):
-    global IPID 
-    pkt = ip.IP(pl.get_payload()) 
-    # IP DON'T FRAGMENT BIT (DF)
-    df_parsed = parse_nmap_field(base[probe][1][1])
-    if (df_parsed == "Y"):
-        frag_bit = 2
-    else:
-        frag_bit = 0
-    # IP INITIAL TIME-TO-LIVE GUESS (TG)
-    TG = int(parse_nmap_field(base[probe][3][1]), 16)
-    # TCP SEQUENCE NUMBER (S)
-    seq_parsed = parse_nmap_field(base[probe][4][1])
-    if seq_parsed == "Z":
-        SEQ = 0
-    elif seq_parsed == "A":
-        SEQ = int(pkt.tcp.ack)
-    elif seq_parsed == "A+":
-        SEQ = int(pkt.tcp.ack)
-        SEQ = SEQ + 1
-    else:
-        SEQ = randint(1, 65535)
-    # TCP ACKNOWLEDGMENT NUMBER (A)
-    if base[probe][5][1] == "Z":
-        ACK = 0
-    elif base[probe][5][1] == "S":
-        ACK = int(pkt.tcp.seq)
-    elif base[probe][5][1] == "S+":
-        ACK = int(pkt.tcp.seq)
-        ACK = ACK + 1
-    else:
-        ACK = randint(1, 65535)
-    # TCP FLAGS (F)
-    #   R = RESET
-    #     WARNING: RST from XXX.XXX.XXX.XXX port 22 -- is this port really open?
-    FLAGS = parse_nmap_field(base[probe][6][1])
-    # TCP OPTIONS
-    opts = []
-    opts = options_to_scapy(parse_nmap_field(base["OPS"][packet - 1][1]))
-    # TODO
-    # TCP RST DATA CHECKSUM
-    # TODO
-    # TCP MISCELLANEOUS QUIRKS
-    W = parse_nmap_field(base["WIN"][packet - 1][1])
-    if ( W != "N"):
-      W = int(W, 16)
-    else :
-      W = None
-    send(IP(dst=inet_ntoa(pkt.src), src=inet_ntoa(pkt.dst), flags=frag_bit, ttl=TG) /
-         TCP(sport=pkt.tcp.dport, dport=pkt.tcp.sport, seq=SEQ, ack=ACK, flags=FLAGS, window=W, options=opts,), verbose=0)
+  raise Exception("Function dropped")
 
 def get_nmap_os_db_path():
-  return os.path.abspath(os.path.dirname(__file__)) + "/dep/nmap-os-db"
+  raise Exception("Function dropped")
 
 # Parse nmap-os-db
 def get_base():
-    f = get_nmap_os_db_path()
-    base = []
-    name = None
-    dic = {}
-    for l in f:
-        l = l.strip()
-        if not l or l[0] == "#":
-            continue
-        if l[:12] == "Fingerprint ":
-            print " [+] Fingerprint selected: %s" % l[12:]
-            name = l[12:].strip()
-            sig = {}
-            p = base
-            continue
-        elif l[:6] == "Class":
-            continue
-        elif l[:4] == "CPE ":
-            continue
-        else:
-            op = l.find("(")
-            cl = l.find(")")
-            if op < 0 or cl < 0:
-                # print "error reading file"
-                continue
-            cursor = l[:op]
-            dic[cursor] = (
-                list(map(lambda x: x.split("="), l[op + 1:cl].split("%"))))
-    return dic
+    raise Exception("Function dropped")
 
 def get_names(search):
-    var = 0
-    dic = {}
-    f = open(get_nmap_os_db_path())
-    for l in f:
-        l = l.strip()
-        if (not l or l[0] == "#") and (var == 1):
-            break
-        if l[:12] == "Fingerprint ":
-            if (l[12:] == search):
-                var = 1
-        if (var == 1):
-            print "      %s" % l
-            if l[:6] == "Class":
-                continue
-            elif l[:4] == "CPE ":
-                continue
-            else:
-                op = l.find("(")
-                cl = l.find(")")
-                if op < 0 or cl < 0:
-                    # print "error reading file"
-                    continue
-                cursor = l[:op]
-                dic[cursor] = (
-                    list(map(lambda x: x.split("="), l[op + 1:cl].split("%"))))
-    return dic
+    raise Exception("Function dropped")
 
 def list_os():
-    f = open(get_nmap_os_db_path())
-    for l in f:
-        l = l.strip()
-        if l[:12] == "Fingerprint ":
-            print "    + \"%s\"" % l[12:]
+    raise Exception("Function dropped")
 
 def get_random_os():
-  random = []
-  f = open(get_nmap_os_db_path())
-  for l in f:
-    l = l.strip()
-    if l[:12] == "Fingerprint ":
-      random.append(l[12:])
-  #random = list(dict.fromkeys(random))
-  value = randint(0,len(random))
-  return random[value]
+    raise Exception("Function dropped")
 
 def search_os(search_string):
-    # Search nmap database
-    nmap_values = []
-    f = open(get_nmap_os_db_path())
-    for l in f:
-        l = l.strip()
-        if l[:12] == "Fingerprint ":
-          if re.search(search_string, l[12:], re.IGNORECASE):
-            nmap_values.append(l[12:])
-    # Remove possible duplicates
-    nmap_values = list(dict.fromkeys(nmap_values))
-    # Print results
-    print " [+] Searching databases for: '%s'" % search_string
-    for x in range(len(nmap_values)):
-      print "      [nmap] \"%s\"" % nmap_values[x]
-    #
-    # Search p0f database
-    db = module_p0f.p0f_kdb.get_base()
-    p0f_values = []
-    for i in range(0, 250):
-      if (re.search(search_string, db[i][6], re.IGNORECASE) or re.search(search_string, db[i][7], re.IGNORECASE)) :
-        p0f_values.append("OS: \"" + db[i][6] + "\" DETAILS: \"" + db[i][7] + "\"")
-    # Print results
-    for x in range(len(p0f_values)):
-      print "      [p0f] %s" % p0f_values[x]
-    exit(0)
+    raise Exception("Function dropped")
 
 def options_to_scapy(x):
     options = []
@@ -603,41 +281,49 @@ def options_to_scapy(x):
     return options
 
 def print_tcp_packet(pl, destination): 
-    pkt = ip.IP(pl.get_payload())
-    option_list = tcp.parse_opts(pkt.tcp.opts)
+    pkt = dpkt.ip.IP(pl.get_payload())
+    option_list = dpkt.tcp.parse_opts(pkt.tcp.opts)
     
     if opts.verbose:
-        print " [+] Packet '%s' (total length %s)" % (destination, pl.get_payload_len())
-        print "      [+] IP:  source %s destination %s tos %s id %s" % (inet_ntoa(pkt.src), inet_ntoa(pkt.dst), pkt.tos, pkt.id)
-        print "      [+] TCP: sport %s dport %s flags %s seq %s ack %s win %s" % (pkt.tcp.sport, pkt.tcp.dport, tcp_flags(pkt.tcp.flags),  pkt.tcp.seq, pkt.tcp.ack, pkt.tcp.win)
-        print "               options %s" % (opts_human(option_list))
+        print(" [+] Packet '%s' (total length %s)" % (destination, pl.get_payload_len()))
+        print("      [+] IP:  source %s destination %s tos %s id %s" % (inet_ntoa(pkt.src), inet_ntoa(pkt.dst), pkt.tos, pkt.id))
+        print("      [+] TCP: sport %s dport %s flags %s seq %s ack %s win %s" % (pkt.tcp.sport, pkt.tcp.dport, tcp_flags(pkt.tcp.flags),  pkt.tcp.seq, pkt.tcp.ack, pkt.tcp.win))
+        print("               options %s" % (opts_human(option_list)))
 
 def print_icmp_packet(pl): 
-    pkt = ip.IP(pl.get_payload())
+    pkt = dpkt.ip.IP(pl.get_payload())
     if opts.verbose:
-        print " [+] Modifying packet in real time (total length %s)" % pl.get_payload_len()
-        print "      [+] IP:   source %s destination %s tos %s id %s" % (inet_ntoa(pkt.src), inet_ntoa(pkt.dst), pkt.tos, pkt.id)
-        print "      [+] ICMP: code %s type %s len %s id %s seq %s" % (pkt.icmp.code, pkt.icmp.type, len(pkt.icmp.data.data), pkt.icmp.data.id, pkt.icmp.data.seq)
+        print(" [+] Modifying packet in real time (total length %s)" % pl.get_payload_len())
+        print("      [+] IP:   source %s destination %s tos %s id %s" % (inet_ntoa(pkt.src), inet_ntoa(pkt.dst), pkt.tos, pkt.id))
+        print("      [+] ICMP: code %s type %s len %s id %s seq %s" % (pkt.icmp.code, pkt.icmp.type, len(pkt.icmp.data.data), pkt.icmp.data.id, pkt.icmp.data.seq))
 
 def print_udp_packet(pl): 
-    pkt = ip.IP(pl.get_payload())
+    pkt = dpkt.ip.IP(pl.get_payload())
 
     if opts.verbose:
-        print " [+] Modifying packet in real time (total length %s)" % pl.get_payload_len()
-        print "      [+] IP:   source %s destination %s tos %s id %s" % (inet_ntoa(pkt.src), inet_ntoa(pkt.dst), pkt.tos, pkt.id)
-        print "      [+] UDP:  sport %s dport %s len %s" % (pkt.udp.sport, pkt.udp.dport, len(pkt.udp.data))
-        print "                data %s" % (pkt.udp.data[0:49])
-        print "                     %s" % (pkt.udp.data[50:99])
-        print "                     %s" % (pkt.udp.data[100:149])
-        print "                     %s" % (pkt.udp.data[150:199])
-        print "                     %s" % (pkt.udp.data[200:249])
-        print "                     %s" % (pkt.udp.data[250:299])
+        print( " [+] Modifying packet in real time (total length %s)" % pl.get_payload_len())
+        print( "      [+] IP:   source %s destination %s tos %s id %s" % (inet_ntoa(pkt.src), inet_ntoa(pkt.dst), pkt.tos, pkt.id))
+        print( "      [+] UDP:  sport %s dport %s len %s" % (pkt.udp.sport, pkt.udp.dport, len(pkt.udp.data)))
+        print( "                data %s" % (pkt.udp.data[0:49]))
+        print( "                     %s" % (pkt.udp.data[50:99]))
+        print( "                     %s" % (pkt.udp.data[100:149]))
+        print( "                     %s" % (pkt.udp.data[150:199]))
+        print( "                     %s" % (pkt.udp.data[200:249]))
+        print( "                     %s" % (pkt.udp.data[250:299]))
 
 # Process p0f packets
 def cb_p0f( pl ): 
 
-    pkt = ip.IP(pl.get_payload())
+    pkt = dpkt.ip.IP(pl.get_payload())
     
+    scapy_packet = IP(bytes(pkt))
+    #flags = TCPFlag(int(scapy_packet[TCP].flags))
+
+    # Not a SYN packet, re-inject unmodified packet into the network stack
+    #if flags != TCPFlag.SYN: print('not SYN')
+
+    #print ( 'flags', flags )
+
     # that condition is too complex, I had to drop SourceIP check, so it will work with PolicyBasedRouting.
     #
     # During PolicyBasedRouting, when we afterwards route the packets via
@@ -646,12 +332,9 @@ def cb_p0f( pl ):
     #if opts.verbose:
         #print " [+] got packet", "flags", tcp_flags(pkt.tcp.flags) , inet_ntoa(pkt.src), ">", inet_ntoa(pkt.dst), "pkt.id", pkt.id
 
-    #if (inet_ntoa(pkt.src) == home_ip) and (pkt.p == ip.IP_PROTO_TCP) and (tcp_flags(pkt.tcp.flags) == "S"):
+    #if (inet_ntoa(pkt.src) == home_ip) and (pkt.p == dpkt.ip.IP_PROTO_TCP) and (tcp_flags(pkt.tcp.flags) == "S"):
     tcp_flag_my=tcp_flags(pkt.tcp.flags)
-    if (pkt.p == ip.IP_PROTO_TCP) and (
-            (tcp_flag_my  == "S") 
-               #or ( tcp_flag_my == "A") 
-            ):
+    if (pkt.p == dpkt.ip.IP_PROTO_TCP) and ( (tcp_flag_my  == "S") ):
 
         if opts.verbose:
             print(" [+] original packet:")
@@ -659,8 +342,9 @@ def cb_p0f( pl ):
             scapy_verbose=True
         else:
             scapy_verbose=False
-
-        options = pkt.tcp.opts.encode('hex_codec')
+        #options = pkt.tcp.opts.encode('hex_codec') # Python 2.7 !!
+        options = codecs.encode( pkt.tcp.opts ,  'hex_codec').decode()
+        #print(options)
         op = options.find("080a")
         if (op != -1):
             op = op + 7
@@ -668,11 +352,8 @@ def cb_p0f( pl ):
             i = int(timestamp, 16)
         if opts.osgenre and opts.details_p0f:
             try:
-                #sig = '*:64:0:*:65535,3:mss,nop,ws,nop,nop,ts2,sok,eol+1:df,id+:0'  #macos
                 if (tcp_flag_my  == "S"):
-
-                    option_list = tcp.parse_opts(pkt.tcp.opts)
-
+                    option_list = dpkt.tcp.parse_opts(pkt.tcp.opts)
                     # when we set: sysctl -w net.ipv4.tcp_timestamps=0
                     ts1=0
                     ts2=0
@@ -686,227 +367,72 @@ def cb_p0f( pl ):
                      elif o == TCP_OPT_MSS:
                       orig_mss= struct.unpack('>H', v)[0]
 
-                      #print "orig ts1", tss[0]
-                      #print "orig ts2", tss[1]
-                      #print "orig mss", orig_mss
+                      #print("orig ts1", tss[0])
+                      #print("orig ts2", tss[1])
+                      #print("orig mss", orig_mss)
 
                     TCP_OPTS=[ ('MSS', orig_mss), ('Timestamp',(ts1,ts2)), ('NOP',0), ('NOP',0), ('NOP',0)  ]
                     
-                    #signature_O= ('65535', 64, 1, 64, 'M1460,N,W5,N,N,T0,S,E,E', 'PZ', 'test', 'testA')
-                    #pkt_send = module_p0f.p0f_impersonate(IP(dst=inet_ntoa(pkt.dst), src=inet_ntoa(pkt.src), id=pkt.id, tos=pkt.tos) / TCP( sport=pkt.tcp.sport, dport=pkt.tcp.dport, flags=tcp_flag_my , seq=pkt.tcp.seq, ack=0), i, signature=signature_O )
-
                     #p0f3:
-                    #sig = ver:ittl:olen:mss:wsize,scale:olayout:quirks:pclass
+                    #sig = ver:ittl:olen:mss:wsize,scale:olayout:quirks:pclass <- Template
+                    #                                                                 incolumi    valdik  brows/lea  whoer 
+                    #                                                               ----------------------------------------
+                    #sig='*:64:0:*:mss*44,1:mss,sok,ts,nop,ws:df,id+:0'               # Lin         Andr   Andr       Andr
+                    #sig='*:64:0:*:mss*44,3:mss,sok,ts,nop,ws:df,id+:0'               # Lin         Andr   Andr       Andr
+                    #sig='*:64:0:*:65535,8:mss,sok,ts,nop,ws:df,id+:0'                # A         L       L           ?
+                    #sig='*:64:0:*:65535,4:mss,nop,ws,nop,nop,ts,sok,eol+1:df,id+:0'  #mac os WORK
+                    #sig='*:64:0:*:65535,3:mss,nop,ws,nop,nop,ts2,sok,eol+1:df,id+:0' #macos
 
-
-                    #sig='*:64:0:*:65535,4:mss,nop,ws,nop,nop,ts,sok,eol+1:df,id+:0' #mac os WORK
-
-#                    sigs_my={
-#                            "Android1":     '*:64:0:*:mss*44,1:mss,sok,ts,nop,ws:df,id+:0', #p0f3 compliant
-#                            "Android2":     '*:64:0:*:mss*44,3:mss,sok,ts,nop,ws:df,id+:0', #p0f3 compliant
-#                            "Android3":     '*:64:0:*:65535,8:mss,sok,ts,nop,ws:df,id+:0',  #p0f3 NOT compliant but modern!
-#                            "ios":          '*:64:0:*:65535,2:mss,nop,ws,nop,nop,ts,sok,eol+1:df,id+:0', #   Mac OS X (iPhone or iPad)
-#                            "macosx_1":     '*:64:0:*:65535,1:mss,nop,ws,nop,nop,ts,sok,eol+1:df,id+:0',
-#                            "macosx_2":     '*:64:0:*:65535,3:mss,nop,ws,nop,nop,ts,sok,eol+1:df,id+:0',
-#                            "macosx_3":     '*:64:0:*:65535,4:mss,nop,ws,nop,nop,ts,sok,eol+1:df,id+:0',
-#                            "macosx_4":     '*:64:0:*:65535,6:mss,nop,ws,nop,nop,ts,sok,eol+1:df,id+:0',
-#                            "win_1":        '*:128:0:*:8192,8:mss,nop,ws,nop,nop,sok:df,id+:0',
-#                            "win_2":        '*:128:0:*:8192,0:mss,nop,nop,sok:df,id+:0',
-#                            "win_3":        '*:128:0:*:8192,2:mss,nop,ws,nop,nop,sok:df,id+:0',
-#                             }
-                
-                    #                                                    incolumi    valdik  brows/lea  whoer 
-                    #sig='*:64:0:*:mss*44,1:mss,sok,ts,nop,ws:df,id+:0' # Lin         Andr   Andr       Andr
-                    #sig='*:64:0:*:mss*44,3:mss,sok,ts,nop,ws:df,id+:0'  # Lin         Andr   Andr       Andr
-                    #sig='*:64:0:*:65535,8:mss,sok,ts,nop,ws:df,id+:0'   # A         L       L           ?
-
-                    #sig_name="win_1"
-                    #sig=sigs_my[sig_name]
-
-                    if opts.verbose: print " [+] dest sig",sig
+                    if opts.verbose: print(" [+] dest sig",sig)
 
                     try:
-                        pkt_send = scapy_p0f.p0f_impersonate(IP(dst=inet_ntoa(pkt.dst), src=inet_ntoa(pkt.src), id=pkt.id, tos=pkt.tos)/TCP( sport=pkt.tcp.sport, dport=pkt.tcp.dport, flags=tcp_flag_my , seq=pkt.tcp.seq, ack=0 , options=TCP_OPTS ), signature=sig, verbose=scapy_verbose )
-                    except ValueError as ve:
-                        print ve
+                        METHOD='old'
+                        if METHOD=='old':
+                            pkt_send = scapy_p0f.p0f_impersonate(
+                                IP(dst=inet_ntoa(pkt.dst), src=inet_ntoa(pkt.src), id=pkt.id, tos=pkt.tos)/TCP( sport=pkt.tcp.sport, dport=pkt.tcp.dport, flags=tcp_flag_my , seq=pkt.tcp.seq, ack=0 , options=TCP_OPTS ), 
+                                signature=sig, 
+                                verbose=scapy_verbose )
+    #                    if METHOD=='new':
+    #                        pkt_send = impersonate_tcp(
+    #                            packet = scapy_packet,
+    #                            raw_label="g:unix:Linux:2.2.x-3.x (barebone)",
+    #                            raw_signature="*:64:0:*:*,0:mss:df,id+:0",
+    #                            )
+                    except Exception as e: 
+                        print(e)
 
-#                if (tcp_flag_my  == "A"):
-#                    # totally useless!!!!!!!!!!!! must be deleted<<<
-#                   
-#                    TCP_OPTS=[ ('NOP',0)   ]
-#                    
-#                    sig = '*:64:0:*:65535,0:mss,nop,ws,sok,eol+1:df,id+:0'
-#
-#                    try:
-#                        pkt_send = scapy_p0f.p0f_impersonate(IP(dst=inet_ntoa(pkt.dst), src=inet_ntoa(pkt.src), id=pkt.id, tos=pkt.tos)/TCP( sport=pkt.tcp.sport, dport=pkt.tcp.dport, flags=tcp_flag_my , seq=pkt.tcp.seq, ack=1, options=TCP_OPTS ), signature=sig , verbose=scapy_verbose )
-#                    except ValueError as ve:
-#                        print " [+] scapy returned:", ve
-#
-#                
-#                    # totally useless!!!!!!!!!!!! must be deleted<<<
                 pkt = IP(dst=inet_ntoa(pkt.dst), src=inet_ntoa(pkt.src), id=pkt.id, tos=pkt.tos) 
-            
-                pl.set_payload(str(pkt_send))
+                pl.set_payload(bytes(pkt_send))
                 pl.accept()  
-            except Exception, e:
-                print " [+] Unable to modify packet with p0f personality..."
-                print " [+] Aborting because:", e
+            except Exception as e:
+                print( " [+] Unable to modify packet with p0f personality...")
+                print( " [+] Aborting because:", e)
                 sys.exit()
         else:
             pl.accept()
     else:
         pl.accept()
         if opts.verbose:
-            print " [+] Ignored packet: source %s destination %s tos %s id %s tcp flag %s" % (inet_ntoa(pkt.src), inet_ntoa(pkt.dst), pkt.tos, pkt.id, tcp_flag_my)
+            print( " [+] Ignored packet: source %s destination %s tos %s id %s tcp flag %s" % (inet_ntoa(pkt.src), inet_ntoa(pkt.dst), pkt.tos, pkt.id, tcp_flag_my))
       #  return 0
 
 # Process nmap packets
 def cb_nmap( pl): 
-    pkt = ip.IP(pl.get_payload())   
-    if pkt.p == ip.IP_PROTO_TCP:
-        # Define vars for conditional loops
-        options = pkt.tcp.opts.encode('hex_codec')
-        flags = tcp_flags(pkt.tcp.flags)
-        if (flags == "S") and (pkt.tcp.win == 1) and (options == T1_opt1):
-            # nmap packet detected: Packet1 #1
-            print_tcp_packet(pl, "nmap")
-            pl.drop() 
-            if (base["T1"][0][1] == "Y"):
-                send_probe_response_T1(pl, "T1", 1)
-        elif (flags == "S") and (pkt.tcp.win == 63) and (options == T1_opt2):
-            # nmap packet detected: Packet1 #2
-            print_tcp_packet(pl, "nmap")
-            pl.drop() 
-            if (base["T1"][0][1] == "Y"):
-                send_probe_response_T1(pl, "T1", 2)
-        elif (flags == "S") and (pkt.tcp.win == 4) and (options == T1_opt3):
-            # nmap packet detected: Packet1 #3
-            print_tcp_packet(pl, "nmap")
-            pl.drop() 
-            if (base["T1"][0][1] == "Y"):
-                send_probe_response_T1(pl, "T1", 3)
-        elif (flags == "S") and (pkt.tcp.win == 4) and (options == T1_opt4):
-            # nmap packet detected: Packet1 #4
-            print_tcp_packet(pl, "nmap")
-            pl.drop() 
-            if (base["T1"][0][1] == "Y"):
-                send_probe_response_T1(pl, "T1", 4)
-        elif (flags == "S") and (pkt.tcp.win == 16) and (options == T1_opt5):
-            # nmap packet detected: Packet1 #5
-            print_tcp_packet(pl, "nmap")
-            pl.drop() 
-            if (base["T1"][0][1] == "Y"):
-                send_probe_response_T1(pl, "T1", 5)
-        elif (flags == "S") and (pkt.tcp.win == 512) and (options == T1_opt6):
-            # nmap packet detected: Packet1 #6
-            print_tcp_packet(pl, "nmap")
-            pl.drop() 
-            if (base["T1"][0][1] == "Y"):
-                send_probe_response_T1(pl, "T1", 6)
-        elif (flags == "") and (pkt.tcp.win == 128) and (options == T2_T6_opt):
-            # nmap packet detected: Packet2
-            print_tcp_packet(pl, "nmap")
-            pl.drop() 
-            if (base["T2"][0][1] == "Y"):
-                send_probe_response(pl, "T2")
-        elif (flags == "FSPU") and (pkt.tcp.win == 256) and (options == T2_T6_opt):
-            # nmap packet detected: Packet3
-            print_tcp_packet(pl, "nmap")
-            pl.drop() 
-            if (base["T3"][0][1] == "Y"):
-                send_probe_response(pl, "T3")
-        elif (flags == "A") and (pkt.tcp.win == 1024) and (options == T2_T6_opt):
-            # nmap packet detected: Packet4
-            print_tcp_packet(pl, "nmap")
-            pl.drop() 
-            if (base["T4"][0][1] == "Y"):
-                send_probe_response(pl, "T4")
-        elif (flags == "S") and (pkt.tcp.win == 31337) and (options == T2_T6_opt):
-            # nmap packet detected: Packet5
-            print_tcp_packet(pl, "nmap")
-            if (base["T5"][0][1] == "Y"):
-                send_probe_response(pl, "T5")
-        elif (flags == "A") and (pkt.tcp.win == 32768) and (options == T2_T6_opt):
-            # nmap packet detected: Packet6
-            print_tcp_packet(pl, "nmap")
-            pl.drop() 
-            if (base["T6"][0][1] == "Y"):
-                send_probe_response(pl, "T6")
-        elif (flags == "FPU") and (pkt.tcp.win == 65535) and (options == T7_opt):
-            # nmap packet detected: Packet7
-            print_tcp_packet(pl, "nmap")
-            pl.drop() 
-            if (base["T7"][0][1] == "Y"):
-                send_probe_response(pl, "T7")
-        elif (flags == "SEC") and (pkt.tcp.win == 3) and (options == ECN_opt):
-            # nmap packet detected: Packet ECE
-            print_tcp_packet(pl, "nmap")
-            pl.drop() 
-            if (base["ECN"][0][1] == "Y"):
-                send_ECN_response(pl, "ECN")
-        else:
-            pl.accept()
-    elif pkt.p == ip.IP_PROTO_UDP:
-        if (pkt.udp.data == udp_payload):
-            # nmap packet detected: Packet UDP
-            print_udp_packet(pl)
-            pl.drop() 
-            # TODO
-            if ( base["U1"][0][0] != "R" ):
-                send_udp_response(pl, "U1")
-        else:
-          pl.accept()
-    elif pkt.p == ip.IP_PROTO_ICMP:
-        if (pkt.icmp.code == 9) and (pkt.icmp.type == 8) and (len(pkt.icmp.data.data) == 120):
-            # nmap packet detected: Packet ICMP #1
-            print_icmp_packet(pl)
-            pl.drop() 
-            if (base["IE"][0][0] != "R"):
-                send_icmp_response(pl, "IE")
-        elif (pkt.icmp.code == 0) and (pkt.icmp.type == 8) and (len(pkt.icmp.data.data) == 150):
-            # nmap packet detected: Packet ICMP #2
-            print_icmp_packet(pl)
-            pl.drop() 
-            if (base["IE"][0][0] != "R"):
-                send_icmp_response(pl, "IE")
-        else: 
-            pl.accept() 
-    else:
-        pl.accept() 
-        return 0
-
+    raise Exception("Function dropped")
 
 def init(queue):
   q = nfqueue.NetfilterQueue()
-  if (opts.os):
-    q.bind(queue, cb_nmap)
-    print "      [->] %s: nmap packet processor" % multiprocessing.current_process().name
   if (opts.details_p0f and opts.osgenre):
     q.bind(queue, cb_p0f)
-    print "      [->] %s: p0f packet processor" % multiprocessing.current_process().name
+    print( "      [->] %s: p0f packet processor" % multiprocessing.current_process().name)
   try: 
     q.run()
-  except KeyboardInterrupt,err:
+  except KeyboardInterrupt as err:
     pass
 
 # Upload database
 def update_nmap_db():
-  sys.stdout.write(' [+] Checking nmap database... ')
-  sys.stdout.flush()
-  url = 'https://svn.nmap.org/nmap/nmap-os-db'
-  response = urllib.urlopen(url)
-  data = response.read()
-  m = hashlib.md5()
-  m.update(data)
-  new_db=m.hexdigest()
-  old_db=md5(get_nmap_os_db_path())
-  if (new_db != old_db):
-		f = open(get_nmap_os_db_path(), "w")
-		f.write(data)
-		f.close()
-		print "updated!"
-  else:
-	  print "latest!"
+    raise Exception("Function dropped")
 
 def md5(fname):
   hash_md5 = hashlib.md5()
@@ -945,22 +471,14 @@ def main():
                     help="process only packets coming from this Cgroup paths (comma separated). Example: kek.slice/my.service,kek.slice/my2.service . Make sure these Cgroup paths already exist! ")
   parser.add_option('-q', '--qnum', action='store',
                     dest='qnum', help="NFQUEUE id to use")
-  parser.add_option('-n', '--nmap', action='store_true',
-                    dest='nmap', help="list available nmap signatures")
-  parser.add_option('-m', '--os_nmap', action='store',
-                    dest='os', help="use nmap Operating System")
   parser.add_option('-p', '--p0f', action='store_true',
                     dest='p0f', help="list available p0f signatures")
   parser.add_option('-o', '--os_p0f', action='store',
                     dest='osgenre', help="use p0f OS Genre")
   parser.add_option('-d', '--details_p0f',
                     action='store', dest='details_p0f', help="choose p0f Details")
-  parser.add_option('-i', '--interface', action='store',
-                    dest='interface', help="choose network interface (eth0)")
-  parser.add_option('-s', '--search', action='store',
-                    dest='search', help="search OS in nmap/p0f v2 db")
-  parser.add_option('-u', '--updatedb', action='store_true',
-                    dest='updatedb', help="update nmap database")
+  #parser.add_option('-i', '--interface', action='store',
+                    #dest='interface', help="choose network interface (eth0)")
   parser.add_option('-v', '--verbose', action='store_true',
                     dest='verbose', help="be verbose")
   parser.add_option('-V', '--version', action='store_true',
@@ -968,126 +486,92 @@ def main():
   global opts
   (opts, args) = parser.parse_args()
 
-  if opts.search:
-    search_os(opts.search)
-    exit(0)
+  #print(opts)
 
   if opts.version:
     exit(0)
 
-  if opts.updatedb:
-    user_is_root()
-    update_nmap_db()
-    exit(0)
-
-  if opts.nmap:
-    print(" [+] Supported list of nmap OS to emulate")
-    list_os()
-    exit(0)
-
   if opts.p0f:
-    print " [+] Supported list of p0f OS to emulate, from ",SIGNATURES,"file; use any in '-o XXX', '-d YYY' flags"
-    print
+    print( " [+] Supported list of p0f OS to emulate, from ",SIGNATURES,"file; use any in '-o XXX', '-d YYY' flags")
+    print()
     signatures=load_signatures()
-    for osgenre, v in signatures.iteritems():
-      for osdetails, s in v.iteritems():
-        print "%s   %s    %s" % (osgenre,osdetails, s)
+    for osgenre in signatures:
+      for osdetails in signatures[osgenre]:
+        s=signatures[osgenre][osdetails]
+        print(f'{osgenre:>20}\t{osdetails:<10} {s}')
     exit(0)
 
   if (opts.details_p0f and not opts.osgenre):
-    print " [ERROR] Please, choose p0f OS system to emulate, not only OS details"
-    print " [+] Use %s -p to list possible candidates" % sys.argv[0]
-    print
+    print( " [ERROR] Please, choose p0f OS system to emulate, not only OS details")
+    print( " [+] Use %s -p to list possible candidates" % sys.argv[0])
+    print()
     sys.exit(' [+] Aborting...')
 
   # Check if user is root before continue
   user_is_root()
 
-  if opts.interface:
-    interface = opts.interface 
-  else:
-    interface = get_default_iface_name_linux()
+#  if opts.interface:
+#    interface = opts.interface 
+#  else:
+  interface = get_default_iface_name_linux()
 
   print(" [+] detected interface: %s" % interface)
 
   if opts.qnum:
-    q_num0  = int(opts.qnum)
     q_num1  = int(opts.qnum)
   else:
-      
       try:
-              q_num0 = sorted(os.listdir("/sys/class/net/")).index(interface) * 2
-                # for spoofing p0f:
-              q_num1 = sorted(os.listdir("/sys/class/net/")).index(interface) * 2 + 1
-      except ValueError, err:
-              q_num0 = -1
-              q_num1 = -1
+            # for spoofing p0f:
+            q_num1 = sorted(os.listdir("/sys/class/net/")).index(interface) * 2 + 1
+      except ValueError as err:
+            q_num1 = -1
 
-  # Global -> get values from cb_nmap() and cb_p0f
+  # Global -> get values from and cb_p0f
   global base
 
-#  if opts.os:
-#    print " [+] Mutating to nmap:"
-#    base = {}
-#    if (opts.os == "random"):
-#      base = get_names(get_random_os())
-#    else:
-#      base = get_names(opts.os)
-#    if (not base):
-#      print "      [->] \"%s\" could not be found in nmap database..." % opts.os
-#      sys.exit(' [+] Aborting...')
-
-  if opts.osgenre and opts.osgenre:
-    print " [+] Mutating to p0f:"
+  if opts.osgenre and opts.details_p0f:
+    print( " [+] Mutating to p0f:")
     global sig
     sig=load_signature(opts.osgenre, opts.details_p0f)
-
     if sig: 
-      print "      OS: %s:%s, with signature %s"  % (opts.osgenre , opts.details_p0f, sig)
+      print( " [+] OS: %s:%s, with signature %s"  % (opts.osgenre , opts.details_p0f, sig))
     else:
-      print "      [->] Could not found that combination in p0f database..."
+      print( "      [->] Could not found that combination in p0f database...")
       sys.exit(' [+] Aborting...')
   else:
-    print " [i] You've only selected p0f OS genre, also select OS details."
+    print( " [i] Select both p0f OS genre and OS details.")
     sys.exit(' [+] Aborting...')
   
   # Start activity
-  print " [+] Activating queues"
+  print( " [+] Activating queues")
   procs = []
-  nmap_iptables_rules_added=False
+  
   p0f_iptables_rules_added=False
-  # nmap mode:
-  if opts.os:  
-    print (" [+] detected Queue %s" % q_num0)
-    os.system("iptables -A INPUT -j NFQUEUE --queue-num %s" % q_num0) 
-    nmap_iptables_rules_added=True
-    proc = Process(target=init,args=(q_num0,))
-    procs.append(proc)
-    proc.start() 
+
   # p0f mode:
 
   iptables_conditions=[]
   rule1="-p TCP  -m multiport --dports 443,446,80 --syn -m comment --comment Osfooler-ng "
 
   if opts.marked:
-    print (" [+] will process only packets marked as %s" % opts.marked)
+    print( (" [+] will process only packets marked as %s" % opts.marked))
     iptables_conditions.append( rule1+ "-m mark --mark  %s" % opts.marked )
   elif opts.cgroup_path:
-    print (" [+] will process only packets from Cgroup Path  %s" % opts.cgroup_path)
+    print( (" [+] will process only packets from Cgroup Path  %s" % opts.cgroup_path))
     for i in opts.cgroup_path.split(","):
         iptables_conditions.append( rule1+"-m cgroup --path %s" % i )
   elif opts.cgroup_classid:
-    print (" [+] will process only packets from Cgroup classid  %s" % opts.cgroup_classid)
+    print( (" [+] will process only packets from Cgroup classid  %s" % opts.cgroup_classid))
     iptables_conditions.append( rule1+"-m cgroup --classid %s" % opts.cgroup_classid)
   else:
-    print (" [+] will process all system packets")
+    print( (" [+] will process all system packets"))
     iptables_conditions.append(rule1)
 
   if (opts.osgenre):
-    global home_ip
-    home_ip = get_ip_address(interface)  
-    print (" [+] detected home_ip %s" % home_ip)
-    print (" [+] detected Queue %s" % q_num1)
+    #global home_ip
+    #home_ip = get_ip_address(interface)  
+    #print( (" [+] detected home_ip %s" % home_ip))
+    print( (" [+] detected Queue %s" % q_num1))
     add_iptables_rules_p0f(iptables_conditions, q_num1)
     p0f_iptables_rules_added=True
     proc = Process(target=init,args=(q_num1,))
@@ -1098,41 +582,36 @@ def main():
   try:
       for proc in procs:
         proc.join()
-      print
+      print()
       # Flush all iptabels rules
-      if (q_num0 >= 0):
-        os.system("iptables -D INPUT -j NFQUEUE --queue-num %s" % q_num0) 
       if (q_num1 >= 1):
         del_iptables_rules_p0f(iptables_conditions, q_num1)
-      print " [+] Active queues removed"
-      print " [+] Exiting OSfooler..." 
+      print( " [+] Active queues removed")
+      print( " [+] Exiting OSfooler..." )
   except KeyboardInterrupt:
-      print
+      print()
       # Flush all iptabels rules
-      if (q_num0 >= 0) and nmap_iptables_rules_added==True:
-        print " [+] del nmap rules for Q", q_num0
-        os.system("iptables -D INPUT -j NFQUEUE --queue-num %s" % q_num0) 
       if (q_num1 >= 1) and p0f_iptables_rules_added==True:
         del_iptables_rules_p0f(iptables_conditions, q_num1)
-      print " [+] Active queues removed [kbd except]"
-      print " [+] Exiting OSfooler... [kbd except]"
+      print( " [+] Active queues removed [kbd except]")
+      print( " [+] Exiting OSfooler... [kbd except]")
       #for p in multiprocessing.active_children():
       #  p.terminate()
 
 def add_iptables_rules_p0f(iptables_conditions, q_num1 ):
     for iptables_condition in iptables_conditions:
         iptables_line="iptables -A OUTPUT %s -j NFQUEUE --queue-num %s" % ( iptables_condition , q_num1  )
-        print " [+] Queue %s, add iptables rule: \n   %s" % (q_num1, iptables_line )
+        print( " [+] Queue %s, add iptables rule: \n   %s" % (q_num1, iptables_line ))
         ret=os.system( iptables_line )
         if ret != 0:
-            print " [+] could not add Iptables rule"
+            print( " [+] could not add Iptables rule")
             del_iptables_rules_p0f(iptables_conditions, q_num1 )
             sys.exit(' [+] Aborting...')
         
 def del_iptables_rules_p0f(iptables_conditions, q_num1 ):
     for iptables_condition in iptables_conditions:
         iptables_line="iptables -D OUTPUT %s -j NFQUEUE --queue-num %s" % ( iptables_condition , q_num1  )
-        print (" [+] Queue %s, del iptables rule: %s" % ( q_num1, iptables_line ) )
+        print( (" [+] Queue %s, del iptables rule: %s" % ( q_num1, iptables_line ) ))
         os.system( iptables_line )
 
 def load_signatures( ):
@@ -1155,3 +634,7 @@ def load_signature( osgenre, details_p0f ):
 
 if __name__ == "__main__":
   main()
+
+
+
+### https://github.com/Nisitay/pyp0f/blob/master/pyp0f/impersonate/tcp.py
