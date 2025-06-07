@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
-
 # -*- coding: utf-8 -*-
-
-# ver:2024-03-14__py3
+# ver:2025-06-07__px_v7
 
 from random import randint
 import hashlib
