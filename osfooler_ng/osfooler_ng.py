@@ -529,8 +529,9 @@ def main():
     signatures=load_signatures()
     for osgenre in signatures:
       for osdetails in signatures[osgenre]:
-        s=signatures[osgenre][osdetails]
-        print(f'{osgenre:>20}\t{osdetails:<10} {s}')
+        sig4=signatures[osgenre][osdetails]['v4']
+        sig6=signatures[osgenre][osdetails]['v6']
+        print(f'{osgenre:>20}\t{osdetails:<10} {sig4} {sig6}')
     exit(0)
 
   if (opts.details_p0f and not opts.osgenre):
@@ -665,17 +666,26 @@ def del_iptables_rules_p0f(iptables_conditions, q_num1 ):
 def load_signatures( ):
     with open(SIGNATURES, 'r') as stream:
         try:
-            parsed_yaml=yaml.load(stream, Loader=yaml.BaseLoader )
+            ret=yaml.load(stream, Loader=yaml.BaseLoader )
         except yaml.YAMLError as exc:
             print(exc)
-    return parsed_yaml
+
+    for osgenre in ret:
+      for osdetails in ret[osgenre]:
+        sig4=ret[osgenre][osdetails]['v4']
+        sig6=ret[osgenre][osdetails].get('v6') 
+
+        if not sig6:
+            ret[osgenre][osdetails]['v6']=convert_v4_sig_to_v6(sig4)
+
+    return ret
 
 def load_signature( osgenre, details_p0f ):
     parsed_yaml=load_signatures()
     #print "signatures loaded", parsed_yaml
     #print "trying to load sig by", osgenre, details_p0f
-    sig4= parsed_yaml[osgenre][details_p0f].get('v4')
-    sig6= parsed_yaml[osgenre][details_p0f].get('v6') or convert_v4_sig_to_v6(sig4)
+    sig4= parsed_yaml[osgenre][details_p0f]['v4']
+    sig6= parsed_yaml[osgenre][details_p0f]['v6']
     return sig4,sig6
 
 def convert_v4_sig_to_v6(sig4):
