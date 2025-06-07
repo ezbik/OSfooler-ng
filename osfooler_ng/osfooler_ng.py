@@ -1,4 +1,5 @@
-#!/usr/bin/python3
+#!/usr/bin/env python3
+
 # -*- coding: utf-8 -*-
 
 # ver:2024-03-14__py3
@@ -21,12 +22,13 @@ l = logging.getLogger("scapy.runtime").setLevel(logging.ERROR)
 from scapy.all import *
 #from dpkt import *
 import dpkt
-from socket import AF_INET, AF_INET6, inet_ntoa
+from socket import AF_INET, AF_INET6, inet_ntoa, inet_ntop
 import urllib
 import multiprocessing
 from multiprocessing import Process
 
 from scapy.layers.inet import IP,TCP
+from scapy.layers.inet6 import IPv6
 import scapy_p0f
 from scapy_p0f import p0f, p0f_impersonate
 
@@ -281,42 +283,55 @@ def options_to_scapy(x):
     return options
 
 def print_tcp_packet(pl, destination): 
-    pkt = dpkt.ip.IP(pl.get_payload())
+
+    pkt_bytes = pl.get_payload()
+    ip_ver =  pkt_bytes[0] >> 4  
+
+    if ip_ver == 4:
+        pkt = dpkt.ip.IP(pl.get_payload())
+        family=AF_INET
+    elif ip_ver == 6:
+        pkt = dpkt.ip6.IP6(pl.get_payload())
+        family=AF_INET6
+    else:
+        raise Exception("unknown IP version")
+    
     option_list = dpkt.tcp.parse_opts(pkt.tcp.opts)
     
+    if family==AF_INET6:
+        tos='n/a'
+        id='n/a'
+    else:
+        tos=pkt.tos
+        id=pkt.id
+
     if opts.verbose:
         print(" [+] Packet '%s' (total length %s)" % (destination, pl.get_payload_len()))
-        print("      [+] IP:  source %s destination %s tos %s id %s" % (inet_ntoa(pkt.src), inet_ntoa(pkt.dst), pkt.tos, pkt.id))
+        print("      [+] IP:  ver %s, source %s destination %s tos %s id %s" % (ip_ver, inet_ntop(family, pkt.src), inet_ntop(family, pkt.dst), tos, id))
         print("      [+] TCP: sport %s dport %s flags %s seq %s ack %s win %s" % (pkt.tcp.sport, pkt.tcp.dport, tcp_flags(pkt.tcp.flags),  pkt.tcp.seq, pkt.tcp.ack, pkt.tcp.win))
         print("               options %s" % (opts_human(option_list)))
 
 def print_icmp_packet(pl): 
-    pkt = dpkt.ip.IP(pl.get_payload())
-    if opts.verbose:
-        print(" [+] Modifying packet in real time (total length %s)" % pl.get_payload_len())
-        print("      [+] IP:   source %s destination %s tos %s id %s" % (inet_ntoa(pkt.src), inet_ntoa(pkt.dst), pkt.tos, pkt.id))
-        print("      [+] ICMP: code %s type %s len %s id %s seq %s" % (pkt.icmp.code, pkt.icmp.type, len(pkt.icmp.data.data), pkt.icmp.data.id, pkt.icmp.data.seq))
+    raise Exception("Function dropped")
 
 def print_udp_packet(pl): 
-    pkt = dpkt.ip.IP(pl.get_payload())
-
-    if opts.verbose:
-        print( " [+] Modifying packet in real time (total length %s)" % pl.get_payload_len())
-        print( "      [+] IP:   source %s destination %s tos %s id %s" % (inet_ntoa(pkt.src), inet_ntoa(pkt.dst), pkt.tos, pkt.id))
-        print( "      [+] UDP:  sport %s dport %s len %s" % (pkt.udp.sport, pkt.udp.dport, len(pkt.udp.data)))
-        print( "                data %s" % (pkt.udp.data[0:49]))
-        print( "                     %s" % (pkt.udp.data[50:99]))
-        print( "                     %s" % (pkt.udp.data[100:149]))
-        print( "                     %s" % (pkt.udp.data[150:199]))
-        print( "                     %s" % (pkt.udp.data[200:249]))
-        print( "                     %s" % (pkt.udp.data[250:299]))
+    raise Exception("Function dropped")
 
 # Process p0f packets
 def cb_p0f( pl ): 
+    pkt_bytes = pl.get_payload()
+    ip_ver =  pkt_bytes[0] >> 4  
 
-    pkt = dpkt.ip.IP(pl.get_payload())
-    
-    scapy_packet = IP(bytes(pkt))
+    if ip_ver == 4:
+        pkt = dpkt.ip.IP(pl.get_payload())
+        family=AF_INET
+    elif ip_ver == 6:
+        pkt = dpkt.ip6.IP6(pl.get_payload())
+        family=AF_INET6
+    else:
+        raise Exception("unknown IP version")
+        
+    #scapy_packet = IP(bytes(pkt))
     #flags = TCPFlag(int(scapy_packet[TCP].flags))
 
     # Not a SYN packet, re-inject unmodified packet into the network stack
@@ -329,92 +344,109 @@ def cb_p0f( pl ):
     # During PolicyBasedRouting, when we afterwards route the packets via
     # .. another interface, its SRC_IP remains always of main interface, as TCP stack sees it.
 
-    #if opts.verbose:
-        #print " [+] got packet", "flags", tcp_flags(pkt.tcp.flags) , inet_ntoa(pkt.src), ">", inet_ntoa(pkt.dst), "pkt.id", pkt.id
-
-    #if (inet_ntoa(pkt.src) == home_ip) and (pkt.p == dpkt.ip.IP_PROTO_TCP) and (tcp_flags(pkt.tcp.flags) == "S"):
     tcp_flag_my=tcp_flags(pkt.tcp.flags)
-    if (pkt.p == dpkt.ip.IP_PROTO_TCP) and ( (tcp_flag_my  == "S") ):
-
+    if not (pkt.p == dpkt.ip.IP_PROTO_TCP and tcp_flag_my  == "S" ):
         if opts.verbose:
-            print(" [+] original packet:")
+            print( " [+] Ignored packet:")
             print_tcp_packet(pl, "p0f")
-            scapy_verbose=True
-        else:
-            scapy_verbose=False
-        #options = pkt.tcp.opts.encode('hex_codec') # Python 2.7 !!
-        options = codecs.encode( pkt.tcp.opts ,  'hex_codec').decode()
-        #print(options)
-        op = options.find("080a")
-        if (op != -1):
-            op = op + 7
-            timestamp = options[op:][:5]
-            i = int(timestamp, 16)
-        if opts.osgenre and opts.details_p0f:
-            try:
-                if (tcp_flag_my  == "S"):
-                    option_list = dpkt.tcp.parse_opts(pkt.tcp.opts)
-                    # when we set: sysctl -w net.ipv4.tcp_timestamps=0
-                    ts1=0
-                    ts2=0
-
-                    # we can retrieve TS only for SYN packets??
-                    for o, v in option_list:
-                     if o == TCP_OPT_TIMESTAMP:
-                      tss=struct.unpack('>II', v)
-                      ts1=tss[0]
-                      ts2=tss[1]
-                     elif o == TCP_OPT_MSS:
-                      orig_mss= struct.unpack('>H', v)[0]
-
-                      #print("orig ts1", tss[0])
-                      #print("orig ts2", tss[1])
-                      #print("orig mss", orig_mss)
-
-                    TCP_OPTS=[ ('MSS', orig_mss), ('Timestamp',(ts1,ts2)), ('NOP',0), ('NOP',0), ('NOP',0)  ]
-                    
-                    #p0f3:
-                    #sig = ver:ittl:olen:mss:wsize,scale:olayout:quirks:pclass <- Template
-                    #                                                                 incolumi    valdik  brows/lea  whoer 
-                    #                                                               ----------------------------------------
-                    #sig='*:64:0:*:mss*44,1:mss,sok,ts,nop,ws:df,id+:0'               # Lin         Andr   Andr       Andr
-                    #sig='*:64:0:*:mss*44,3:mss,sok,ts,nop,ws:df,id+:0'               # Lin         Andr   Andr       Andr
-                    #sig='*:64:0:*:65535,8:mss,sok,ts,nop,ws:df,id+:0'                # A         L       L           ?
-                    #sig='*:64:0:*:65535,4:mss,nop,ws,nop,nop,ts,sok,eol+1:df,id+:0'  #mac os WORK
-                    #sig='*:64:0:*:65535,3:mss,nop,ws,nop,nop,ts2,sok,eol+1:df,id+:0' #macos
-
-                    if opts.verbose: print(" [+] dest sig",sig)
-
-                    try:
-                        METHOD='old'
-                        if METHOD=='old':
-                            pkt_send = scapy_p0f.p0f_impersonate(
-                                IP(dst=inet_ntoa(pkt.dst), src=inet_ntoa(pkt.src), id=pkt.id, tos=pkt.tos)/TCP( sport=pkt.tcp.sport, dport=pkt.tcp.dport, flags=tcp_flag_my , seq=pkt.tcp.seq, ack=0 , options=TCP_OPTS ), 
-                                signature=sig, 
-                                verbose=scapy_verbose )
-    #                    if METHOD=='new':
-    #                        pkt_send = impersonate_tcp(
-    #                            packet = scapy_packet,
-    #                            raw_label="g:unix:Linux:2.2.x-3.x (barebone)",
-    #                            raw_signature="*:64:0:*:*,0:mss:df,id+:0",
-    #                            )
-                    except Exception as e: 
-                        print(e)
-
-                pkt = IP(dst=inet_ntoa(pkt.dst), src=inet_ntoa(pkt.src), id=pkt.id, tos=pkt.tos) 
-                pl.set_payload(bytes(pkt_send))
-                pl.accept()  
-            except Exception as e:
-                print( " [+] Unable to modify packet with p0f personality...")
-                print( " [+] Aborting because:", e)
-                sys.exit()
-        else:
-            pl.accept()
-    else:
         pl.accept()
-        if opts.verbose:
-            print( " [+] Ignored packet: source %s destination %s tos %s id %s tcp flag %s" % (inet_ntoa(pkt.src), inet_ntoa(pkt.dst), pkt.tos, pkt.id, tcp_flag_my))
-      #  return 0
+
+    if opts.verbose:
+        print(" [+] original packet:")
+        print_tcp_packet(pl, "p0f")
+        scapy_verbose=True
+    else:
+        scapy_verbose=False
+
+    options = codecs.encode( pkt.tcp.opts ,  'hex_codec').decode()
+    #print(options)
+    op = options.find("080a") # ??????
+    if (op != -1):
+        op = op + 7
+        timestamp = options[op:][:5]
+    i = int(timestamp, 16)
+    try:
+        option_list = dpkt.tcp.parse_opts(pkt.tcp.opts)
+        # when we set: sysctl -w net.ipv4.tcp_timestamps=0
+        ts1=0
+        ts2=0
+
+        # we can retrieve TS only for SYN packets??
+        for o, v in option_list:
+            if o == TCP_OPT_TIMESTAMP:
+                ts1,ts2=struct.unpack('>II', v)
+            elif o == TCP_OPT_MSS:
+                orig_mss= struct.unpack('>H', v)[0]
+
+        #print("orig ts1", tss[0])
+        #print("orig ts2", tss[1])
+        #print("orig mss", orig_mss)
+
+        TCP_OPTS=[ ('MSS', orig_mss), ('Timestamp',(ts1,ts2)), ('NOP',0), ('NOP',0), ('NOP',0)  ]
+        
+        #p0f3:
+        #sig = ver:ittl:olen:mss:wsize,scale:olayout:quirks:pclass <- Template
+        #                                                                 incolumi    valdik  brows/lea  whoer 
+        #                                                               ----------------------------------------
+        #sig='*:64:0:*:mss*44,1:mss,sok,ts,nop,ws:df,id+:0'               # Lin         Andr   Andr       Andr
+        #sig='*:64:0:*:mss*44,3:mss,sok,ts,nop,ws:df,id+:0'               # Lin         Andr   Andr       Andr
+        #sig='*:64:0:*:65535,8:mss,sok,ts,nop,ws:df,id+:0'                # A         L       L           ?
+        #sig='*:64:0:*:65535,4:mss,nop,ws,nop,nop,ts,sok,eol+1:df,id+:0'  #mac os WORK
+        #sig='*:64:0:*:65535,3:mss,nop,ws,nop,nop,ts2,sok,eol+1:df,id+:0' #macos
+
+        ###### v6 sigs:
+        #sig = '*:64:0:*:mss*45,8:mss,nop,ws,nop,nop,sok:flow:0'             # windows 10 pro 
+        #sig = '*:255:0:*:65535,8:mss,nop,ws,nop,nop,sok:flow:0'             # windows 11 pro
+        #sig = '*:255:0:*:65535,6:mss,nop,ws,nop,nop,ts,sok,eol+1:ecn,flow:0' # iPhone 12 Pro Max iOS 16.2
+        sig = '*:64:0:*:65535,6:mss,nop,ws,nop,nop,ts,sok,eol+1:flow:0'     # iPhone 16 pro max iOS 18.5  
+
+        if opts.verbose: print(" [+] dest sig",sig)
+
+        #     if METHOD=='new': pkt_send = impersonate_tcp( packet = scapy_packet, raw_label="g:unix:Linux:2.2.x-3.x (barebone)", raw_signature="*:64:0:*:*,0:mss:df,id+:0",)
+
+        if ip_ver== 4:
+            if opts.verbose: print( " [+] sending packet object to Scapy [v6]")
+            pkt_send = scapy_p0f.p0f_impersonate(
+                IP(
+                    dst=inet_ntop(family, pkt.dst), 
+                    src=inet_ntop(family, pkt.src), 
+                    id=pkt.id, 
+                    tos=pkt.tos
+                    )/TCP( 
+                        sport=pkt.tcp.sport, 
+                        dport=pkt.tcp.dport, 
+                        flags=tcp_flag_my , 
+                        seq=pkt.tcp.seq, 
+                        ack=0 , 
+                        options=TCP_OPTS 
+                        ), 
+                signature=sig, 
+                verbose=scapy_verbose )
+        if ip_ver== 6:
+            if opts.verbose: print( " [+] sending packet object to Scapy [v6]")
+            pkt_send = scapy_p0f.p0f_impersonate(
+                IPv6(
+                    dst=inet_ntop(family, pkt.dst), 
+                    src=inet_ntop(family, pkt.src), 
+                    )/TCP( 
+                        sport=pkt.tcp.sport, 
+                        dport=pkt.tcp.dport, 
+                        flags=tcp_flag_my , 
+                        seq=pkt.tcp.seq, 
+                        ack=0 , 
+                        options=TCP_OPTS 
+                        ), 
+                signature=sig, 
+                verbose=scapy_verbose )
+    
+        #pkt = IP(dst=inet_ntop(family, pkt.dst), src=inet_ntop(family, pkt.src), id=pkt.id, tos=pkt.tos) 
+
+        pl.set_payload(bytes(pkt_send))
+        pl.accept()  
+    except Exception as e:
+        print( " [!] Unable to modify packet with p0f personality...")
+        print( " [!] Aborting because:", e)
+        sys.exit()
 
 # Process nmap packets
 def cb_nmap( pl): 
@@ -558,10 +590,11 @@ def main():
   
   if skip_iptables:
     print(" [+] Skip adding iptables rules, but you can divert traffic to this NFQUEUE ID, example: ")
-    print("     iptables -A OUTPUT -p tcp --syn -j NFQUEUE --queue-num %s" % q_num1 )
+    print("     iptables  -A OUTPUT -p tcp --syn -j NFQUEUE --queue-num %s" % q_num1 )
+    print("     ip6tables -A OUTPUT -p tcp --syn -j NFQUEUE --queue-num %s" % q_num1 )
   else:
       iptables_conditions=[]
-      rule1="-p TCP  -m multiport --dports 443,446,80 --syn -m comment --comment Osfooler-ng "
+      rule1="-p TCP  -m multiport --dports 443,80 --syn -m comment --comment Osfooler-ng "
 
       if opts.marked:
         print( (" [+] will process only packets marked as %s" % opts.marked))
@@ -594,14 +627,14 @@ def main():
         proc.join()
       print()
       # Flush all iptabels rules
-      if (q_num1 >= 1):
+      if q_num1 >= 1 and not skip_iptables :
         del_iptables_rules_p0f(iptables_conditions, q_num1)
       print( " [+] Active queues removed")
       print( " [+] Exiting OSfooler..." )
   except KeyboardInterrupt:
       print()
       # Flush all iptabels rules
-      if (q_num1 >= 1):
+      if q_num1 >= 1 :
         if skip_iptables:
             print(" [+] Skip deleting iptables rules")
         else :
@@ -613,19 +646,21 @@ def main():
 
 def add_iptables_rules_p0f(iptables_conditions, q_num1 ):
     for iptables_condition in iptables_conditions:
-        iptables_line="iptables -A OUTPUT %s -j NFQUEUE --queue-num %s" % ( iptables_condition , q_num1  )
-        print( " [+] Queue %s, add iptables rule: \n   %s" % (q_num1, iptables_line ))
-        ret=os.system( iptables_line )
-        if ret != 0:
-            print( " [+] could not add Iptables rule")
-            del_iptables_rules_p0f(iptables_conditions, q_num1 )
-            sys.exit(' [+] Aborting...')
+        for ipt_ver in [ 'iptables', 'ip6tables' ]:
+            iptables_line="%s -A OUTPUT %s -j NFQUEUE --queue-num %s" % ( ipt_ver, iptables_condition , q_num1  )
+            print( " [+] Queue %s, add iptables rule: \n   %s" % (q_num1, iptables_line ))
+            ret=os.system( iptables_line )
+            if ret != 0:
+                print( " [+] could not add Iptables rule")
+                del_iptables_rules_p0f(iptables_conditions, q_num1 )
+                sys.exit(' [+] Aborting...')
         
 def del_iptables_rules_p0f(iptables_conditions, q_num1 ):
     for iptables_condition in iptables_conditions:
-        iptables_line="iptables -D OUTPUT %s -j NFQUEUE --queue-num %s" % ( iptables_condition , q_num1  )
-        print( (" [+] Queue %s, del iptables rule: %s" % ( q_num1, iptables_line ) ))
-        os.system( iptables_line )
+        for ipt_ver in [ 'iptables', 'ip6tables' ]:
+            iptables_line="%s -D OUTPUT %s -j NFQUEUE --queue-num %s" % ( ipt_ver, iptables_condition , q_num1  )
+            print( (" [+] Queue %s, del iptables rule: %s" % ( q_num1, iptables_line ) ))
+            os.system( iptables_line )
 
 def load_signatures( ):
     with open(SIGNATURES, 'r') as stream:

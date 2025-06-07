@@ -18,3 +18,7 @@
 
     * added -I for skipping adding iptables rules by the Osfooler, instead, you have to redirect some packets
       by iptables to the desired NFQUEUE id.
+
+2025-06-07
+
+    * added Ipv6 suppport.
