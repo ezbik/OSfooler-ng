@@ -569,12 +569,14 @@ def main():
   if opts.osgenre and opts.details_p0f:
     print( " [+] Mutating to p0f:")
     global sig
-    sig=load_signature(opts.osgenre, opts.details_p0f)
-    if sig: 
-      print( " [+] OS: %s:%s, with signature %s"  % (opts.osgenre , opts.details_p0f, sig))
+    sig4,sig6=load_signature(opts.osgenre, opts.details_p0f)
+    if sig4 and sig6 : 
+        print( " [+] OS: %s:%s"  % (opts.osgenre , opts.details_p0f))
+        print( " [+] -> Ipv4 destination signature %s"  % ( sig4))
+        print( " [+] -> Ipv6 destination signature %s"  % ( sig6))
     else:
-      print( "      [->] Could not found that combination in p0f database...")
-      sys.exit(' [+] Aborting...')
+        print( "      [->] Could not found that combination in p0f database...")
+        sys.exit(' [+] Aborting...')
   else:
     print( " [i] Select both p0f OS genre and OS details.")
     sys.exit(' [+] Aborting...')
@@ -672,11 +674,16 @@ def load_signature( osgenre, details_p0f ):
     parsed_yaml=load_signatures()
     #print "signatures loaded", parsed_yaml
     #print "trying to load sig by", osgenre, details_p0f
-    ret=parsed_yaml[osgenre][details_p0f]
-    if ret:
-        return ret
-    
+    sig4= parsed_yaml[osgenre][details_p0f].get('v4')
+    sig6= parsed_yaml[osgenre][details_p0f].get('v6') or convert_v4_sig_to_v6(sig4)
+    return sig4,sig6
 
+def convert_v4_sig_to_v6(sig4):
+    # sig4 == '*:64:0:*:65535,8:mss,sok,ts,nop,ws:df,id+:0'
+    if not sig4: return ""
+    parts[6]='flow'
+    sig6=":".join(parts)
+    return sig6
 
 if __name__ == "__main__":
   main()
