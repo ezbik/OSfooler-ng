@@ -323,9 +323,11 @@ def cb_p0f( pl ):
     if ip_ver == 4:
         pkt = dpkt.ip.IP(pl.get_payload())
         family=AF_INET
+        sig = sig4
     elif ip_ver == 6:
         pkt = dpkt.ip6.IP6(pl.get_payload())
         family=AF_INET6
+        sig = sig6
     else:
         raise Exception("unknown IP version")
         
@@ -396,7 +398,8 @@ def cb_p0f( pl ):
         #sig = '*:64:0:*:mss*45,8:mss,nop,ws,nop,nop,sok:flow:0'             # windows 10 pro 
         #sig = '*:255:0:*:65535,8:mss,nop,ws,nop,nop,sok:flow:0'             # windows 11 pro
         #sig = '*:255:0:*:65535,6:mss,nop,ws,nop,nop,ts,sok,eol+1:ecn,flow:0' # iPhone 12 Pro Max iOS 16.2
-        sig = '*:64:0:*:65535,6:mss,nop,ws,nop,nop,ts,sok,eol+1:flow:0'     # iPhone 16 pro max iOS 18.5  
+        #sig = '*:64:0:*:65535,6:mss,nop,ws,nop,nop,ts,sok,eol+1:flow:0'     # iPhone 16 pro max iOS 18.5  
+
 
         if opts.verbose: print(" [+] dest sig",sig)
 
@@ -689,8 +692,6 @@ def load_signatures( ):
 
 def load_signature( osgenre, details_p0f ):
     parsed_yaml=load_signatures()
-    #print "signatures loaded", parsed_yaml
-    #print "trying to load sig by", osgenre, details_p0f
     sig4= parsed_yaml[osgenre][details_p0f]['v4']
     sig6= parsed_yaml[osgenre][details_p0f]['v6']
     return sig4,sig6
