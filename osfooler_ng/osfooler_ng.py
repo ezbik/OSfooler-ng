@@ -597,8 +597,8 @@ def main():
   
   if skip_iptables:
     print(" [+] Skip adding iptables rules, but you can divert traffic to this NFQUEUE ID, example: ")
-    print("     iptables  -A OUTPUT -p tcp --syn -j NFQUEUE --queue-num %s" % q_num1 )
-    print("     ip6tables -A OUTPUT -p tcp --syn -j NFQUEUE --queue-num %s" % q_num1 )
+    print(" [?] iptables  -A OUTPUT -p tcp --syn -j NFQUEUE --queue-num %s" % q_num1 )
+    print(" [?] ip6tables -A OUTPUT -p tcp --syn -j NFQUEUE --queue-num %s" % q_num1 )
   else:
       iptables_conditions=[]
       rule1="-p TCP  -m multiport --dports 443,80 --syn -m comment --comment Osfooler-ng "
