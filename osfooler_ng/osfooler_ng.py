@@ -526,6 +526,7 @@ def main():
   if opts.version:
     exit(0)
 
+  global sig4, sig6
   if opts.p0f:
     print( " [+] Supported list of p0f OS to emulate, from ",SIGNATURES,"file; use any in '-o XXX', '-d YYY' flags")
     print()
@@ -575,7 +576,6 @@ def main():
 
   if opts.osgenre and opts.details_p0f:
     print( " [+] Mutating to p0f:")
-    global sig
     sig4,sig6=load_signature(opts.osgenre, opts.details_p0f)
     if sig4 and sig6 : 
         print( " [+] OS: %s:%s"  % (opts.osgenre , opts.details_p0f))
