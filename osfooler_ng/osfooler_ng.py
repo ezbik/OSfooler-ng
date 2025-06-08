@@ -602,7 +602,10 @@ def main():
       iptables_conditions=[]
       rule1="-p TCP  -m multiport --dports 443,80 --syn -m comment --comment Osfooler-ng "
 
-      if opts.marked:
+      if interface:
+        print(" [+] will process only packets towards interface %s" % ( interface )) 
+        iptables_conditions.append( rule1+"-o %s" % ( interface ) )
+      elif opts.marked:
         print( (" [+] will process only packets marked as %s" % opts.marked))
         iptables_conditions.append( rule1+ "-m mark --mark  %s" % opts.marked )
       elif opts.cgroup_path:
@@ -612,9 +615,6 @@ def main():
       elif opts.cgroup_classid:
         print( (" [+] will process only packets from Cgroup classid  %s" % opts.cgroup_classid))
         iptables_conditions.append( rule1+"-m cgroup --classid %s" % opts.cgroup_classid)
-      elif interface:
-        print(" [+] will process only packets towards interface %s" % ( interface )) 
-        iptables_conditions.append( rule1+"-o %s" % ( interface ) )
       else:
         print( (" [+] will process all system packets"))
         iptables_conditions.append(rule1)
