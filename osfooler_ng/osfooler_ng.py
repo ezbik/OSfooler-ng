@@ -622,34 +622,39 @@ def main():
     #home_ip = get_ip_address(interface)  
     #print( (" [+] detected home_ip %s" % home_ip))
     print( (" [+] detected Queue %s" % q_num1))
-    if not skip_iptables:
+    if skip_iptables:
+        proc=None
+        print( " [+] Running NFQ processor in main process" )
+        init(q_num1)
+    else:
         add_iptables_rules_p0f(iptables_conditions, q_num1)
-    proc = Process(target=init,args=(q_num1,))
-    procs.append(proc)
-    proc.start() 
-  # Detect mode
+        proc = Process(target=init,args=(q_num1,))
+        procs.append(proc)
+        print( " [+] Running NFQ processor in a side process" )
+        proc.start() 
 
-  try:
-      for proc in procs:
-        proc.join()
-      print()
-      # Flush all iptabels rules
-      if q_num1 >= 1 and not skip_iptables :
-        del_iptables_rules_p0f(iptables_conditions, q_num1)
-      print( " [+] Active queues removed")
-      print( " [+] Exiting OSfooler..." )
-  except KeyboardInterrupt:
-      print()
-      # Flush all iptabels rules
-      if q_num1 >= 1 :
-        if skip_iptables:
-            print(" [+] Skip deleting iptables rules")
-        else :
+
+        try:
+          for proc in procs:
+            proc.join()
+          print()
+          # Flush all iptabels rules
+          if q_num1 >= 1 and not skip_iptables :
             del_iptables_rules_p0f(iptables_conditions, q_num1)
-      print( " [+] Active queues removed [kbd except]")
-      print( " [+] Exiting OSfooler... [kbd except]")
-      #for p in multiprocessing.active_children():
-      #  p.terminate()
+          print( " [+] Active queues removed")
+          print( " [+] Exiting OSfooler..." )
+        except KeyboardInterrupt:
+          print()
+          # Flush all iptabels rules
+          if q_num1 >= 1 :
+            if skip_iptables:
+                print(" [+] Skip deleting iptables rules")
+            else :
+                del_iptables_rules_p0f(iptables_conditions, q_num1)
+          print( " [+] Active queues removed [kbd except]")
+          print( " [+] Exiting OSfooler... [kbd except]")
+          #for p in multiprocessing.active_children():
+          #  p.terminate()
 
 def add_iptables_rules_p0f(iptables_conditions, q_num1 ):
     for iptables_condition in iptables_conditions:
