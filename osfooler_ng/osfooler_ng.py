@@ -453,7 +453,7 @@ def cb_p0f( pl ):
 def cb_nmap( pl): 
     raise Exception("Function dropped")
 
-def init(queue):
+def init_q(queue):
   q = nfqueue.NetfilterQueue()
   if (opts.details_p0f and opts.osgenre):
     q.bind(queue, cb_p0f)
@@ -481,16 +481,7 @@ def user_is_root():
       return
 
 def get_default_iface_name_linux():
-    route = "/proc/net/route"
-    with open(route) as f:
-        for line in f.readlines():
-            try:
-                iface, dest, _, flags, _, _, _, _, _, _, _, =  line.strip().split()
-                if dest != '00000000' or not int(flags, 16) & 2:
-                    continue
-                return iface
-            except:
-                continue
+    raise Exception("Function dropped")
 
 def main():
   # Main program begins here
@@ -596,7 +587,7 @@ def main():
         print(" [?] ip6tables -A OUTPUT -p tcp --syn -j NFQUEUE --queue-num %s" % q_num1 )
         proc=None
         print( " [+] Running NFQ processor in main process" )
-        init(q_num1)
+        init_q(q_num1)
   else:
       procs = []
       iptables_conditions=[]
@@ -620,7 +611,7 @@ def main():
         iptables_conditions.append(rule1)
 
       add_iptables_rules_p0f(iptables_conditions, q_num1)
-      proc = Process(target=init,args=(q_num1,))
+      proc = Process(target=init_q,args=(q_num1,))
       procs.append(proc)
       print( " [+] Running NFQ processor in a side process" )
       proc.start() 
