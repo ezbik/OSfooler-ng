@@ -153,10 +153,7 @@ def show_banner():
 
 # Which packet is?
 def check_even(number):
-  if number % 2 == 0:
-    return 1
-  else:
-    return 0
+    raise Exception("Function dropped")
 
 # Display TCP flags in human format
 def tcp_flags(flags):
