@@ -531,7 +531,10 @@ def main():
       for osdetails in signatures[osgenre]:
         sig4=signatures[osgenre][osdetails]['v4']
         sig6=signatures[osgenre][osdetails]['v6']
-        print(f'{osgenre:>20}\t{osdetails:<10} {sig4} {sig6}')
+        desc=signatures[osgenre][osdetails]['desc']
+        print(f'{osgenre:>10}:{osdetails:<10} {desc}')
+        print(f'       ipv4     {sig4}')
+        print(f'       ipv6     {sig6}')
     exit(0)
 
   if (opts.details_p0f and not opts.osgenre):
@@ -676,7 +679,11 @@ def load_signatures( ):
         sig6=ret[osgenre][osdetails].get('v6') 
 
         if not sig6:
-            ret[osgenre][osdetails]['v6']=convert_v4_sig_to_v6(sig4)
+            sig6 = convert_v4_sig_to_v6(sig4)
+            ret[osgenre][osdetails]['v6']=sig6
+
+        if not ret[osgenre][osdetails].get('desc'):
+            ret[osgenre][osdetails]['desc']='???????'
 
     return ret
 
@@ -691,6 +698,7 @@ def load_signature( osgenre, details_p0f ):
 def convert_v4_sig_to_v6(sig4):
     # sig4 == '*:64:0:*:65535,8:mss,sok,ts,nop,ws:df,id+:0'
     if not sig4: return ""
+    parts=sig4.split(":")
     parts[6]='flow'
     sig6=":".join(parts)
     return sig6
