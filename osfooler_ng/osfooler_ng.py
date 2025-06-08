@@ -512,8 +512,8 @@ def main():
                     dest='osgenre', help="use p0f OS Genre")
   parser.add_option('-d', '--details_p0f',
                     action='store', dest='details_p0f', help="choose p0f Details")
-  #parser.add_option('-i', '--interface', action='store',
-                    #dest='interface', help="choose network interface (eth0)")
+  parser.add_option('-i', '--interface', action='store',
+                    dest='interface', help="choose network interface (eth0)")
   parser.add_option('-v', '--verbose', action='store_true',
                     dest='verbose', help="be verbose")
   parser.add_option('-V', '--version', action='store_true',
@@ -555,21 +555,17 @@ def main():
   # Check if user is root before continue
   user_is_root()
 
-#  if opts.interface:
-#    interface = opts.interface 
-#  else:
-  interface = get_default_iface_name_linux()
-
-  print(" [+] detected interface: %s" % interface)
+  interface=''
+  if opts.interface:
+    interface = opts.interface 
+    print(" [+] detected interface: %s" % interface)
 
   if opts.qnum:
     q_num1  = int(opts.qnum)
+    print( (" [+] Detected Queue %s" % q_num1))
   else:
-      try:
-            # for spoofing p0f:
-            q_num1 = sorted(os.listdir("/sys/class/net/")).index(interface) * 2 + 1
-      except ValueError as err:
-            q_num1 = -1
+    q_num1 = random.randint(1,1000)
+    print( (" [+] Auto generated Queue %s" % q_num1))
 
   # Global -> get values from and cb_p0f
   global base
@@ -590,16 +586,19 @@ def main():
   
   # Start activity
   print( " [+] Activating queues")
-  procs = []
   
   # p0f mode:
 
   
   if skip_iptables:
-    print(" [+] Skip adding iptables rules, but you can divert traffic to this NFQUEUE ID, example: ")
-    print(" [?] iptables  -A OUTPUT -p tcp --syn -j NFQUEUE --queue-num %s" % q_num1 )
-    print(" [?] ip6tables -A OUTPUT -p tcp --syn -j NFQUEUE --queue-num %s" % q_num1 )
+        print(" [+] Skip adding iptables rules, but you can divert traffic to this NFQUEUE ID, example: ")
+        print(" [?] iptables  -A OUTPUT -p tcp --syn -j NFQUEUE --queue-num %s" % q_num1 )
+        print(" [?] ip6tables -A OUTPUT -p tcp --syn -j NFQUEUE --queue-num %s" % q_num1 )
+        proc=None
+        print( " [+] Running NFQ processor in main process" )
+        init(q_num1)
   else:
+      procs = []
       iptables_conditions=[]
       rule1="-p TCP  -m multiport --dports 443,80 --syn -m comment --comment Osfooler-ng "
 
@@ -613,28 +612,20 @@ def main():
       elif opts.cgroup_classid:
         print( (" [+] will process only packets from Cgroup classid  %s" % opts.cgroup_classid))
         iptables_conditions.append( rule1+"-m cgroup --classid %s" % opts.cgroup_classid)
+      elif interface:
+        print(" [+] will process only packets towards interface %s" % ( interface )) 
+        iptables_conditions.append( rule1+"-o %s" % ( interface ) )
       else:
         print( (" [+] will process all system packets"))
         iptables_conditions.append(rule1)
 
-  if (opts.osgenre):
-    #global home_ip
-    #home_ip = get_ip_address(interface)  
-    #print( (" [+] detected home_ip %s" % home_ip))
-    print( (" [+] detected Queue %s" % q_num1))
-    if skip_iptables:
-        proc=None
-        print( " [+] Running NFQ processor in main process" )
-        init(q_num1)
-    else:
-        add_iptables_rules_p0f(iptables_conditions, q_num1)
-        proc = Process(target=init,args=(q_num1,))
-        procs.append(proc)
-        print( " [+] Running NFQ processor in a side process" )
-        proc.start() 
+      add_iptables_rules_p0f(iptables_conditions, q_num1)
+      proc = Process(target=init,args=(q_num1,))
+      procs.append(proc)
+      print( " [+] Running NFQ processor in a side process" )
+      proc.start() 
 
-
-        try:
+      try:
           for proc in procs:
             proc.join()
           print()
@@ -643,7 +634,7 @@ def main():
             del_iptables_rules_p0f(iptables_conditions, q_num1)
           print( " [+] Active queues removed")
           print( " [+] Exiting OSfooler..." )
-        except KeyboardInterrupt:
+      except KeyboardInterrupt:
           print()
           # Flush all iptabels rules
           if q_num1 >= 1 :
