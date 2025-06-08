@@ -148,7 +148,7 @@ def show_banner():
  /+/++:-/s+///:-`                     \\/                             \\/                     \\/_____/
  `  `-///s:                           
       `-os.                           v1.0b (https://github.com/segofensiva/osfooler-ng)
-       /s:                            v1.0d (https://github.com/ezbik/osfooler-ng)
+       /s:                            v1.0e (https://github.com/ezbik/osfooler-ng)
 """)
 
 # Which packet is?
@@ -582,7 +582,7 @@ def main():
         print( " [+] -> Ipv4 destination signature %s"  % ( sig4))
         print( " [+] -> Ipv6 destination signature %s"  % ( sig6))
     else:
-        print( "      [->] Could not found that combination in p0f database...")
+        print( " [!] Could not found that combination in p0f database...")
         sys.exit(' [+] Aborting...')
   else:
     print( " [i] Select both p0f OS genre and OS details.")
@@ -660,7 +660,7 @@ def add_iptables_rules_p0f(iptables_conditions, q_num1 ):
     for iptables_condition in iptables_conditions:
         for ipt_ver in [ 'iptables', 'ip6tables' ]:
             iptables_line="%s -A OUTPUT %s -j NFQUEUE --queue-num %s" % ( ipt_ver, iptables_condition , q_num1  )
-            print( " [+] Queue %s, add iptables rule: \n   %s" % (q_num1, iptables_line ))
+            print( " [+] Queue %s, add iptables rule:   %s" % (q_num1, iptables_line ))
             ret=os.system( iptables_line )
             if ret != 0:
                 print( " [+] could not add Iptables rule")
@@ -697,8 +697,8 @@ def load_signatures( ):
 
 def load_signature( osgenre, details_p0f ):
     parsed_yaml=load_signatures()
-    sig4= parsed_yaml[osgenre][details_p0f]['v4']
-    sig6= parsed_yaml[osgenre][details_p0f]['v6']
+    sig4= parsed_yaml.get(osgenre, {}).get(details_p0f, {}).get('v4')
+    sig6= parsed_yaml.get(osgenre, {}).get(details_p0f, {}).get('v6')
     return sig4,sig6
 
 def convert_v4_sig_to_v6(sig4):
