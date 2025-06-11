@@ -190,6 +190,10 @@ def opts_human(options):
       opts.append("NOP")
     elif o == TCP_OPT_SACKOK:
       opts.append("SACK")
+    elif o == TCP_OPT_EOL:
+      opts.append("EOL")
+    else:
+      opts.append(f"{o}{v}")
   return opts
 
 # GET IP ID ICMP
@@ -277,21 +281,22 @@ def options_to_scapy(x):
             options.append(('EOL', None))
     return options
 
-def print_tcp_packet(pl, destination): 
+def print_tcp_packet(pkt_bytes , destination): 
 
-    pkt_bytes = pl.get_payload()
     ip_ver =  pkt_bytes[0] >> 4  
 
     if ip_ver == 4:
-        pkt = dpkt.ip.IP(pl.get_payload())
+        pkt = dpkt.ip.IP( pkt_bytes )
         family=AF_INET
     elif ip_ver == 6:
-        pkt = dpkt.ip6.IP6(pl.get_payload())
+        pkt = dpkt.ip6.IP6( pkt_bytes )
         family=AF_INET6
     else:
         raise Exception("unknown IP version")
     
+    #print( 'opts dump', pkt.tcp.opts, len( pkt.tcp.opts)  )
     option_list = dpkt.tcp.parse_opts(pkt.tcp.opts)
+    #print( 'opts dump', option_list  )
     
     if family==AF_INET6:
         tos='n/a'
@@ -300,11 +305,10 @@ def print_tcp_packet(pl, destination):
         tos=pkt.tos
         id=pkt.id
 
-    if opts.verbose:
-        print(" [+] Packet '%s' (total length %s)" % (destination, pl.get_payload_len()))
-        print("      [+] IP:  ver %s, source %s destination %s tos %s id %s" % (ip_ver, inet_ntop(family, pkt.src), inet_ntop(family, pkt.dst), tos, id))
-        print("      [+] TCP: sport %s dport %s flags %s seq %s ack %s win %s" % (pkt.tcp.sport, pkt.tcp.dport, tcp_flags(pkt.tcp.flags),  pkt.tcp.seq, pkt.tcp.ack, pkt.tcp.win))
-        print("               options %s" % (opts_human(option_list)))
+    print(" [+] Packet '%s' (total length %s)" % (destination, len( pkt_bytes) ))
+    print("      [+] IP:  ver %s, source %s destination %s tos %s id %s" % (ip_ver, inet_ntop(family, pkt.src), inet_ntop(family, pkt.dst), tos, id))
+    print("      [+] TCP: sport %s dport %s flags %s seq %s ack %s win %s" % (pkt.tcp.sport, pkt.tcp.dport, tcp_flags(pkt.tcp.flags),  pkt.tcp.seq, pkt.tcp.ack, pkt.tcp.win))
+    print("               options %s" % (opts_human(option_list)))
 
 def print_icmp_packet(pl): 
     raise Exception("Function dropped")
@@ -318,11 +322,11 @@ def cb_p0f( pl ):
     ip_ver =  pkt_bytes[0] >> 4  
 
     if ip_ver == 4:
-        pkt = dpkt.ip.IP(pl.get_payload())
+        pkt = dpkt.ip.IP( pkt_bytes )
         family=AF_INET
         sig = sig4
     elif ip_ver == 6:
-        pkt = dpkt.ip6.IP6(pl.get_payload())
+        pkt = dpkt.ip6.IP6( pkt_bytes )
         family=AF_INET6
         sig = sig6
     else:
@@ -345,12 +349,12 @@ def cb_p0f( pl ):
     if not (pkt.p == dpkt.ip.IP_PROTO_TCP and tcp_flag_my  == "S" ):
         if opts.verbose:
             print( " [+] Ignored packet:")
-            print_tcp_packet(pl, "p0f")
+            print_tcp_packet(pkt_bytes , "p0f")
         pl.accept()
 
     if opts.verbose:
         print(" [+] original packet:")
-        print_tcp_packet(pl, "p0f")
+        print_tcp_packet(pkt_bytes, "p0f")
         scapy_verbose=True
     else:
         scapy_verbose=False
@@ -403,7 +407,7 @@ def cb_p0f( pl ):
         #     if METHOD=='new': pkt_send = impersonate_tcp( packet = scapy_packet, raw_label="g:unix:Linux:2.2.x-3.x (barebone)", raw_signature="*:64:0:*:*,0:mss:df,id+:0",)
 
         if ip_ver== 4:
-            if opts.verbose: print( " [+] sending packet object to Scapy [v6]")
+            if opts.verbose: print( " [+] sending packet object to Scapy [v4]")
             pkt_send = scapy_p0f.p0f_impersonate(
                 IP(
                     dst=inet_ntop(family, pkt.dst), 
@@ -436,11 +440,29 @@ def cb_p0f( pl ):
                         ), 
                 signature=sig, 
                 verbose=scapy_verbose )
-    
-        #pkt = IP(dst=inet_ntop(family, pkt.dst), src=inet_ntop(family, pkt.src), id=pkt.id, tos=pkt.tos) 
+#            pkt_send = IPv6(
+#                dst=inet_ntop(family, pkt.dst),
+#                src=inet_ntop(family, pkt.src),
+#                )/TCP(
+#                        sport=pkt.tcp.sport,
+#                        dport=pkt.tcp.dport,
+#                        flags=tcp_flag_my ,
+#                        seq=pkt.tcp.seq,
+#                        ack=0 ,
+#                        options= [
+#                            ('MSS', 1380),
+#                            ('MSS', 1380),
+#                            ('MSS', 1380),
+#                            ('MSS', 1380),
+#                            ('MSS', 1380),
+#                            ('NOP', None),
+#                            ]  
+#                        )
+#        if opts.verbose:  print_tcp_packet( bytes(pkt_send) , "AFTER MODS")
 
         pl.set_payload(bytes(pkt_send))
         pl.accept()  
+
     except Exception as e:
         print( " [!] Unable to modify packet with p0f personality...")
         print( " [!] Aborting because:", e)
