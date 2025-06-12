@@ -440,29 +440,24 @@ def cb_p0f( pl ):
                         ), 
                 signature=sig, 
                 verbose=scapy_verbose )
-#            pkt_send = IPv6(
-#                dst=inet_ntop(family, pkt.dst),
+#            pkt1 = IPv6(
 #                src=inet_ntop(family, pkt.src),
+#                dst=inet_ntop(family, pkt.dst),
 #                )/TCP(
 #                        sport=pkt.tcp.sport,
 #                        dport=pkt.tcp.dport,
 #                        flags=tcp_flag_my ,
 #                        seq=pkt.tcp.seq,
 #                        ack=0 ,
-#                        options= [
-#                            ('MSS', 1380),
-#                            ('MSS', 1380),
-#                            ('MSS', 1380),
-#                            ('MSS', 1380),
-#                            ('MSS', 1380),
-#                            ('NOP', None),
-#                            ]  
+#                        options= TCP_OPTS , 
 #                        )
-#        if opts.verbose:  print_tcp_packet( bytes(pkt_send) , "AFTER MODS")
-
+#
+        if opts.verbose:
+            print_tcp_packet( bytes(pkt_send) , "AFTER MODS")
+            #print( bytes(pkt_send) )
         pl.set_payload(bytes(pkt_send))
-        pl.accept()  
 
+        pl.accept()  
     except Exception as e:
         print( " [!] Unable to modify packet with p0f personality...")
         print( " [!] Aborting because:", e)
@@ -546,9 +541,11 @@ def main():
         sig4=signatures[osgenre][osdetails]['v4']
         sig6=signatures[osgenre][osdetails]['v6']
         desc=signatures[osgenre][osdetails]['desc']
-        print(f'{osgenre:>10}:{osdetails:<10} {desc}')
-        print(f'       ipv4     {sig4}')
-        print(f'       ipv6     {sig6}')
+        print(f'   {osgenre}:{osdetails} -> {desc}')
+        print(f'      ipv4     {sig4}')
+        print(f'      ipv6     {sig6}')
+    print()
+    print(" [+] Exit")
     exit(0)
 
   if (opts.details_p0f and not opts.osgenre):
